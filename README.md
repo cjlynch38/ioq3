@@ -1,3 +1,27 @@
+The goal of this `legacy-os-support` branch is to maintain compatibility
+with older operating systems by incorporating as many changes from the
+`main` branch without removing Makefile or older SDL2 compatibility.
+The current focus is older versions of Mac OS X going as far back as 10.3.
+
+The following commits from the `main` branch have been omitted in whole
+or in part to maintain reverse compatibility. 
+
+```
+a4d4b1743e3a56ad25627b99a5e5cc5e5aa6e4d9
+69ad3699ea0966ad3aed4ff136ec280fa9e29b28
+322883b65c1bf030e141af2801364803b1b62709
+2c893f2fc2a5792c835ae415c090be681b634495
+7cc97b63ec3669b19f4493401de7020d9cd57978
+f7d99fc8c63d5f1eec6b60a3119ccfd8aa4d3592
+93c92898499cffd9af2bd711161bc538a958b7dd
+145e803e6ea1d604af5de0d61af5c4009400ccf7
+5449053008d21972742cbc9b6dc21a3abc33bde7
+76043c78b97fda620c6da1a1c4eb1ba48c81f576
+e29c74e1367fe4c5c6676964bbaaa29003227cdc
+```
+
+The original README is as follows:
+
 ![Build](https://github.com/ioquake/ioq3/workflows/Build/badge.svg)
 
                    ,---------------------------------------.
