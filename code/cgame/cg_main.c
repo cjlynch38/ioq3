@@ -277,7 +277,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_cam_dist, "cg_cam_dist", "110", CVAR_ARCHIVE },
 	{ &cg_cam_minDist, "cg_cam_minDist", "42", CVAR_ARCHIVE },
 	{ &cg_cam_height, "cg_cam_height", "20", CVAR_ARCHIVE },
-	{ &cg_cam_side, "cg_cam_side", "22", CVAR_ARCHIVE },
+	{ &cg_cam_side, "cg_cam_side", "0", CVAR_ARCHIVE },
 	{ &cg_cam_radius, "cg_cam_radius", "6", CVAR_ARCHIVE },
 	{ &cg_cam_followSpeed, "cg_cam_followSpeed", "18", CVAR_ARCHIVE },
 	{ &cg_cam_followSpeedZ, "cg_cam_followSpeedZ", "30", CVAR_ARCHIVE },
