@@ -1931,7 +1931,8 @@ static void CG_DrawCrosshair3D(void)
 	int			ca;
 
 	trace_t trace;
-	vec3_t endpos;
+	vec3_t endpos, ent_origin, dirToAim;
+	float dist;
 	float stereoSep, zProj, maxdist, xmax;
 	char rendererinfos[128];
 	refEntity_t ent;
@@ -1941,10 +1942,6 @@ static void CG_DrawCrosshair3D(void)
 	}
 
 	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR) {
-		return;
-	}
-
-	if ( cg.renderingThirdPerson ) {
 		return;
 	}
 
@@ -1970,25 +1967,58 @@ static void CG_DrawCrosshair3D(void)
 	// first get all the important renderer information
 	trap_Cvar_VariableStringBuffer("r_zProj", rendererinfos, sizeof(rendererinfos));
 	zProj = atof(rendererinfos);
-	trap_Cvar_VariableStringBuffer("r_stereoSeparation", rendererinfos, sizeof(rendererinfos));
-	stereoSep = zProj / atof(rendererinfos);
 	
 	xmax = zProj * tan(cg.refdef.fov_x * M_PI / 360.0f);
-	
-	// let the trace run through until a change in stereo separation of the crosshair becomes less than one pixel.
-	maxdist = cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax);
-	VectorMA(cg.refdef.vieworg, maxdist, cg.refdef.viewaxis[0], endpos);
-	CG_Trace(&trace, cg.refdef.vieworg, NULL, NULL, endpos, 0, MASK_SHOT);
-	
+
+	if ( cg.renderingThirdPerson ) {
+		// The reticle marks where the shot will really land, which is not the
+		// centre of the screen: the shot leaves the character but the camera
+		// looks from behind and above them. Putting it in the world keeps it
+		// glued to the target no matter how the camera lags.
+		VectorSubtract( cg.camAimPoint, cg.refdef.vieworg, dirToAim );
+		dist = VectorNormalize( dirToAim );
+
+		// Lift it off the surface it landed on. The aim point sits exactly on
+		// the wall plane, so a sprite centred there is coplanar with the wall
+		// and gets swallowed by it.
+		VectorMA( cg.camAimPoint, -2.0f, dirToAim, ent_origin );
+	} else {
+		trap_Cvar_VariableStringBuffer("r_stereoSeparation", rendererinfos, sizeof(rendererinfos));
+		stereoSep = zProj / atof(rendererinfos);
+
+		// let the trace run through until a change in stereo separation of the crosshair becomes less than one pixel.
+		maxdist = cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax);
+
+		VectorMA(cg.refdef.vieworg, maxdist, cg.refdef.viewaxis[0], endpos);
+		CG_Trace(&trace, cg.refdef.vieworg, NULL, NULL, endpos, 0, MASK_SHOT);
+		VectorCopy( trace.endpos, ent_origin );
+		dist = trace.fraction * maxdist;
+	}
+
 	memset(&ent, 0, sizeof(ent));
 	ent.reType = RT_SPRITE;
 	ent.renderfx = RF_DEPTHHACK | RF_CROSSHAIR;
 	
-	VectorCopy(trace.endpos, ent.origin);
+	VectorCopy(ent_origin, ent.origin);
 	
 	// scale the crosshair so it appears the same size for all distances
-	ent.radius = w / 640 * xmax * trace.fraction * maxdist / zProj;
+	ent.radius = w / 640 * xmax * dist / zProj;
 	ent.customShader = hShader;
+
+	// A shader registered for 2D use is rgbGen/alphaGen vertex, so it takes its
+	// colour from the entity. The memset above leaves that at zero, which draws
+	// the sprite fully transparent.
+	ent.shaderRGBA[0] = 255;
+	ent.shaderRGBA[1] = 255;
+	ent.shaderRGBA[2] = 255;
+	ent.shaderRGBA[3] = 255;
+
+	if ( cg_debugAim.integer && ( cg.time % 500 ) < 50 ) {
+		CG_Printf( "aim %.0f %.0f %.0f  cam %.0f %.0f %.0f  dist %.0f \n",
+			cg.camAimPoint[0], cg.camAimPoint[1], cg.camAimPoint[2],
+			cg.refdef.vieworg[0], cg.refdef.vieworg[1], cg.refdef.vieworg[2],
+			dist );
+	}
 
 	trap_R_AddRefEntityToScene(&ent);
 }
@@ -2644,7 +2674,7 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 	// clear around the rendered view if sized down
 	CG_TileClear();
 
-	if(stereoView != STEREO_CENTER)
+	if(stereoView != STEREO_CENTER || cg.renderingThirdPerson)
 		CG_DrawCrosshair3D();
 
 	// draw 3D view

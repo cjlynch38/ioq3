@@ -50,6 +50,12 @@ vmCvar_t	g_maxclients;
 vmCvar_t	g_maxGameClients;
 vmCvar_t	g_dedicated;
 vmCvar_t	g_speed;
+
+// Third person camera geometry. CVAR_SYSTEMINFO so the client reads the same
+// numbers the server aims with; cgame registers these names too.
+vmCvar_t	cam_dist;
+vmCvar_t	cam_height;
+vmCvar_t	cam_side;
 vmCvar_t	g_gravity;
 vmCvar_t	g_cheats;
 vmCvar_t	g_knockback;
@@ -139,6 +145,9 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse  },
 
 	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
+	{ &cam_dist, "cam_dist", "110", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &cam_height, "cam_height", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &cam_side, "cam_side", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue  },
 	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },
 	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },

@@ -279,6 +279,43 @@ static float CG_CameraLagFraction( float speed, int msec ) {
 
 /*
 ===============
+CG_UpdateAimPoint
+
+Works out the world point the shot will actually hit, so the reticle can be
+drawn there instead of at the centre of the screen.
+
+Uses the same idealised camera position the server aims from (bg_camera.c)
+rather than the smoothed, wall-hugging camera we render from. If it used the
+visible camera the reticle would drift off the real impact point every time the
+camera lagged or got pushed by geometry.
+===============
+*/
+static void CG_UpdateAimPoint( void ) {
+	vec3_t		source, eye, end, forward;
+	trace_t		trace;
+
+	AngleVectors( cg.refdefViewAngles, forward, NULL, NULL );
+
+	BG_CameraViewSource( &cg.predictedPlayerState, cg.refdefViewAngles,
+		cam_dist.value, cam_height.value, cam_side.value, source );
+
+	VectorCopy( cg.predictedPlayerState.origin, eye );
+	eye[2] += cg.predictedPlayerState.viewheight;
+
+	// keep the pivot out of the world, matching G_AimFromCamera
+	CG_Trace( &trace, eye, NULL, NULL, source, cg.predictedPlayerState.clientNum,
+		MASK_SOLID );
+	VectorCopy( trace.endpos, source );
+
+	VectorMA( source, 8192, forward, end );
+	CG_Trace( &trace, source, NULL, NULL, end, cg.predictedPlayerState.clientNum,
+		MASK_SHOT );
+
+	VectorCopy( trace.endpos, cg.camAimPoint );
+}
+
+/*
+===============
 CG_OffsetThirdPersonView
 
 Spring arm third person camera.
@@ -329,7 +366,7 @@ static void CG_OffsetThirdPersonView( void ) {
 	// snap rather than smear on a teleport, a respawn, or any large jump
 	if ( !cg.camValid || cg.thisFrameTeleport || VectorLength( delta ) > 64 ) {
 		VectorCopy( anchor, cg.camAnchor );
-		cg.camDist = cg_cam_dist.value;
+		cg.camDist = cam_dist.value;
 		cg.camValid = qtrue;
 	} else {
 		// vertical follow is deliberately faster than horizontal: too slow and
@@ -362,9 +399,9 @@ static void CG_OffsetThirdPersonView( void ) {
 		// the ideal camera spot: back along the view axis, offset to the
 		// shoulder and raised a little
 		VectorCopy( cg.camAnchor, boomStart );
-		VectorMA( boomStart, cg_cam_side.value * offsetScale, right, boomStart );
-		boomStart[2] += cg_cam_height.value * offsetScale;
-		VectorMA( boomStart, -cg_cam_dist.value, forward, boomEnd );
+		VectorMA( boomStart, cam_side.value * offsetScale, right, boomStart );
+		boomStart[2] += cam_height.value * offsetScale;
+		VectorMA( boomStart, -cam_dist.value, forward, boomEnd );
 
 		VectorSubtract( boomEnd, cg.camAnchor, boomDir );
 		wanted = VectorNormalize( boomDir );
@@ -411,6 +448,8 @@ static void CG_OffsetThirdPersonView( void ) {
 	}
 
 	VectorMA( cg.camAnchor, cg.camDist, boomDir, cg.refdef.vieworg );
+
+	CG_UpdateAimPoint();
 }
 
 

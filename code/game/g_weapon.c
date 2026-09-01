@@ -796,6 +796,54 @@ void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t localForward,
 
 /*
 ===============
+G_AimFromCamera
+
+Third person aims at whatever the camera is looking at, not along the body's
+own forward vector.
+
+Without this the shot leaves the muzzle on a ray parallel to the camera's, but
+displaced by the camera offset, so it lands consistently low (and to one side
+if the camera is over a shoulder) at every range.
+
+The aim pivot is the idealised camera position from bg_camera.c rather than the
+camera the player actually sees: the visible one is smoothed and pushed around
+by walls, and the server cannot reproduce either. The two agree closely enough
+that the world space reticle drawn by cgame lands on the same spot.
+===============
+*/
+static void G_AimFromCamera( gentity_t *ent, const vec3_t muzzlePoint ) {
+	vec3_t		source, eye, end, dir, angles;
+	trace_t		tr;
+
+	if ( cam_dist.value <= 0 ) {
+		return;			// first person: the body forward is already right
+	}
+
+	BG_CameraViewSource( &ent->client->ps, ent->client->ps.viewangles,
+		cam_dist.value, cam_height.value, cam_side.value, source );
+
+	VectorCopy( ent->client->ps.origin, eye );
+	eye[2] += ent->client->ps.viewheight;
+
+	// keep the pivot out of the world, the way the visible camera does, or a
+	// camera buried in a wall aims the shot straight back at the player
+	trap_Trace( &tr, eye, NULL, NULL, source, ent->s.number, MASK_SOLID );
+	VectorCopy( tr.endpos, source );
+
+	VectorMA( source, 8192, forward, end );
+	trap_Trace( &tr, source, NULL, NULL, end, ent->s.number, MASK_SHOT );
+
+	VectorSubtract( tr.endpos, muzzlePoint, dir );
+	if ( VectorNormalize( dir ) < 1 ) {
+		return;			// degenerate, keep the original direction
+	}
+
+	vectoangles( dir, angles );
+	AngleVectors( angles, forward, right, up );
+}
+
+/*
+===============
 FireWeapon
 ===============
 */
@@ -828,6 +876,8 @@ void FireWeapon( gentity_t *ent ) {
 	AngleVectors (ent->client->ps.viewangles, forward, right, up);
 
 	CalcMuzzlePointOrigin ( ent, ent->client->oldOrigin, forward, right, up, muzzle );
+
+	G_AimFromCamera( ent, muzzle );
 
 	// fire the specific weapon
 	switch( ent->s.weapon ) {

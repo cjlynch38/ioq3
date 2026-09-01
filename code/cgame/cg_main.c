@@ -106,6 +106,7 @@ vmCvar_t	cg_draw3dIcons;
 vmCvar_t	cg_drawIcons;
 vmCvar_t	cg_drawAmmoWarning;
 vmCvar_t	cg_drawCrosshair;
+vmCvar_t	cg_debugAim;
 vmCvar_t	cg_drawCrosshairNames;
 vmCvar_t	cg_drawRewards;
 vmCvar_t	cg_crosshairSize;
@@ -142,10 +143,11 @@ vmCvar_t	cg_zoomFov;
 vmCvar_t	cg_thirdPerson;
 vmCvar_t	cg_thirdPersonRange;
 vmCvar_t	cg_thirdPersonAngle;
-vmCvar_t	cg_cam_dist;
+// server owned camera geometry: cgame reads what qagame aims with
+vmCvar_t	cam_dist;
+vmCvar_t	cam_height;
+vmCvar_t	cam_side;
 vmCvar_t	cg_cam_minDist;
-vmCvar_t	cg_cam_height;
-vmCvar_t	cg_cam_side;
 vmCvar_t	cg_cam_radius;
 vmCvar_t	cg_cam_followSpeed;
 vmCvar_t	cg_cam_followSpeedZ;
@@ -236,6 +238,7 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE  },
 	{ &cg_drawAttacker, "cg_drawAttacker", "1", CVAR_ARCHIVE  },
 	{ &cg_drawCrosshair, "cg_drawCrosshair", "4", CVAR_ARCHIVE },
+	{ &cg_debugAim, "cg_debugAim", "0", CVAR_CHEAT },
 	{ &cg_drawCrosshairNames, "cg_drawCrosshairNames", "1", CVAR_ARCHIVE },
 	{ &cg_drawRewards, "cg_drawRewards", "1", CVAR_ARCHIVE },
 	{ &cg_crosshairSize, "cg_crosshairSize", "24", CVAR_ARCHIVE },
@@ -274,10 +277,10 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_thirdPersonRange, "cg_thirdPersonRange", "40", CVAR_ARCHIVE },
 	{ &cg_thirdPersonAngle, "cg_thirdPersonAngle", "0", CVAR_ARCHIVE },
 	{ &cg_thirdPerson, "cg_thirdPerson", "1", CVAR_ARCHIVE },
-	{ &cg_cam_dist, "cg_cam_dist", "110", CVAR_ARCHIVE },
+	{ &cam_dist, "cam_dist", "110", CVAR_SYSTEMINFO },
+	{ &cam_height, "cam_height", "20", CVAR_SYSTEMINFO },
+	{ &cam_side, "cam_side", "0", CVAR_SYSTEMINFO },
 	{ &cg_cam_minDist, "cg_cam_minDist", "42", CVAR_ARCHIVE },
-	{ &cg_cam_height, "cg_cam_height", "20", CVAR_ARCHIVE },
-	{ &cg_cam_side, "cg_cam_side", "0", CVAR_ARCHIVE },
 	{ &cg_cam_radius, "cg_cam_radius", "6", CVAR_ARCHIVE },
 	{ &cg_cam_followSpeed, "cg_cam_followSpeed", "18", CVAR_ARCHIVE },
 	{ &cg_cam_followSpeedZ, "cg_cam_followSpeedZ", "30", CVAR_ARCHIVE },

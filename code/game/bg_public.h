@@ -705,6 +705,10 @@ void	BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerSta
 
 void	BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad );
 
+// bg_camera.c -- third person camera geometry shared by cgame and qagame
+void	BG_CameraViewSource( const playerState_t *ps, const vec3_t viewangles,
+							 float dist, float height, float side, vec3_t source );
+
 void	BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean snap );
 void	BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s, int time, qboolean snap );
 
