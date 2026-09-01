@@ -131,16 +131,92 @@ relative to the view angles, so facing the target and pushing forward is all
 that a straight line chase needs.
 ===============
 */
+/*
+===============
+G_MonsterSeparation
+
+Repulsion from other nearby monsters, so a group spreads into a ring around its
+target instead of stacking on the same spot.
+
+They already collide - MASK_PLAYERSOLID includes CONTENTS_BODY - but collision
+alone only stops them interpenetrating, it does not stop them all trying to
+stand in the same place and pressing into a heap. The rendered models are also
+wider than the 30 unit collision hull, so bodies visibly overlap well before
+the hulls touch.
+===============
+*/
+static void G_MonsterSeparation( gentity_t *ent, vec3_t push ) {
+	gentity_t	*other;
+	vec3_t		delta;
+	float		dist, radius;
+	int			i;
+
+	VectorClear( push );
+
+	radius = g_monsterSeparation.value;
+	if ( radius <= 0 ) {
+		return;
+	}
+
+	for ( i = MAX_CLIENTS; i < level.num_entities; i++ ) {
+		other = &g_entities[i];
+
+		if ( other == ent || !other->inuse ) {
+			continue;
+		}
+		if ( other->s.eType != ET_MONSTER ) {
+			continue;
+		}
+
+		VectorSubtract( ent->ai->ps.origin, other->r.currentOrigin, delta );
+		delta[2] = 0;
+		dist = VectorLength( delta );
+
+		if ( dist >= radius ) {
+			continue;
+		}
+
+		if ( dist < 1.0f ) {
+			// Exactly coincident, so there is no direction to push along.
+			// Derive one from the entity number rather than at random: the
+			// same pair must not pick opposite answers on alternate frames or
+			// they jitter instead of separating.
+			delta[0] = ( ent->s.number & 1 ) ? 1.0f : -1.0f;
+			delta[1] = ( ent->s.number & 2 ) ? 1.0f : -1.0f;
+			delta[2] = 0;
+			dist = 1.0f;
+		}
+
+		VectorNormalize( delta );
+
+		// strength falls off with distance, so close crowding pushes hardest
+		VectorMA( push, ( radius - dist ) / radius, delta, push );
+	}
+}
+
+/*
+===============
+G_MonsterSteer
+
+Turns the synthesised usercmd into a move. The monster always faces its target,
+and moves with forwardmove/rightmove relative to that facing, the way a player
+strafes: that lets it sidestep around its neighbours without ever turning its
+back on what it is chasing.
+===============
+*/
 static void G_MonsterSteer( gentity_t *ent, const monsterDef_t *def ) {
 	monsterAI_t	*ai = ent->ai;
 	gentity_t	*enemy;
-	vec3_t		delta, angles;
-	float		dist;
+	vec3_t		delta, angles, desired, push;
+	vec3_t		facing, right;
+	float		dist, range, len, fwdMove, rightMove;
 	int			i;
 
 	ai->cmd.forwardmove = 0;
 	ai->cmd.rightmove = 0;
 	ai->cmd.upmove = 0;
+
+	VectorClear( desired );
 
 	if ( ai->enemyNum == ENTITYNUM_NONE ) {
 		ai->state = MSTATE_IDLE;
@@ -148,7 +224,13 @@ static void G_MonsterSteer( gentity_t *ent, const monsterDef_t *def ) {
 		enemy = &g_entities[ ai->enemyNum ];
 
 		VectorSubtract( enemy->r.currentOrigin, ai->ps.origin, delta );
-		delta[2] = 0;			// steer in the horizontal plane only
+
+		// Range is judged in three dimensions but steering is flattened. Using
+		// the flat distance for both makes a monster directly below its target
+		// believe it has arrived, so it stops at the bottom of a drop and
+		// stares upward instead of finding a way round.
+		range = VectorLength( delta );
+		delta[2] = 0;
 		dist = VectorLength( delta );
 
 		if ( dist > 1 ) {
@@ -158,14 +240,41 @@ static void G_MonsterSteer( gentity_t *ent, const monsterDef_t *def ) {
 			ai->ps.viewangles[ROLL] = 0;
 		}
 
-		if ( dist > g_monsterStandoff.value ) {
+		if ( range > g_monsterStandoff.value ) {
 			ai->state = MSTATE_CHASE;
-			ai->cmd.forwardmove = 127;
 			ai->ps.speed = def->runSpeed;
+			if ( dist > 1 ) {
+				VectorScale( delta, 1.0f / dist, desired );
+			}
 		} else {
-			ai->state = MSTATE_ATTACK;		// in range: hold position
+			// In range. Stop closing, but keep taking the separation term so
+			// arrivals shuffle sideways into a ring rather than piling into
+			// whoever got there first.
+			ai->state = MSTATE_ATTACK;
 			ai->ps.speed = def->walkSpeed;
 		}
+	}
+
+	G_MonsterSeparation( ent, push );
+	VectorMA( desired, g_monsterSeparationWeight.value, push, desired );
+
+	len = VectorLength( desired );
+	if ( len > 0.01f ) {
+		if ( len > 1.0f ) {
+			VectorScale( desired, 1.0f / len, desired );
+		}
+
+		AngleVectors( ai->ps.viewangles, facing, right, NULL );
+		facing[2] = 0;
+		right[2] = 0;
+		VectorNormalize( facing );
+		VectorNormalize( right );
+
+		fwdMove = DotProduct( desired, facing ) * 127.0f;
+		rightMove = DotProduct( desired, right ) * 127.0f;
+
+		ai->cmd.forwardmove = (signed char)Com_Clamp( -127, 127, fwdMove );
+		ai->cmd.rightmove = (signed char)Com_Clamp( -127, 127, rightMove );
 	}
 
 	// Pmove derives the view angles from cmd.angles plus delta_angles, so the
