@@ -99,10 +99,13 @@ static void G_MonsterFindEnemy( gentity_t *ent ) {
 			continue;
 		}
 
+		// MASK_SOLID, not MASK_SHOT: the latter includes CONTENTS_BODY, which
+		// means monsters block each other's line of sight and only whichever
+		// one happens to stand in front ever notices the player.
 		trap_Trace( &tr, ai->ps.origin, NULL, NULL, player->r.currentOrigin,
-			ent->s.number, MASK_SHOT );
-		if ( tr.fraction < 1.0f && tr.entityNum != player->s.number ) {
-			continue;		// something solid in the way
+			ent->s.number, MASK_SOLID );
+		if ( tr.fraction < 1.0f ) {
+			continue;		// world geometry in the way
 		}
 
 		if ( !best || dist < bestDist ) {
@@ -303,7 +306,8 @@ Creates a monster at a position. Returns NULL if the type is unknown.
 gentity_t *G_SpawnMonster( const char *name, vec3_t origin, float yaw ) {
 	const monsterDef_t	*def;
 	gentity_t			*ent;
-	vec3_t				angles;
+	vec3_t				angles, spot, start, end;
+	trace_t				tr;
 
 	def = BG_MonsterDefByName( name );
 	if ( !def ) {
@@ -331,9 +335,26 @@ gentity_t *G_SpawnMonster( const char *name, vec3_t origin, float yaw ) {
 	ent->r.contents = CONTENTS_BODY;
 	ent->clipmask = MASK_PLAYERSOLID;
 
-	VectorCopy( origin, ent->s.origin );
-	VectorCopy( origin, ent->r.currentOrigin );
-	VectorCopy( origin, ent->s.pos.trBase );
+	// Drop to the surface underneath, the way item spawning does. Sloped
+	// ground otherwise leaves a monster hanging in the air or half buried,
+	// depending on which way the slope runs. The trace uses the monster's own
+	// hull, so where it lands is somewhere it can actually stand.
+	VectorCopy( origin, spot );
+	VectorCopy( spot, start );
+	start[2] += 64;
+	VectorCopy( spot, end );
+	end[2] -= 4096;
+
+	trap_Trace( &tr, start, ent->r.mins, ent->r.maxs, end, ent->s.number, MASK_PLAYERSOLID );
+	if ( !tr.startsolid && !tr.allsolid && tr.fraction < 1.0f ) {
+		VectorCopy( tr.endpos, spot );
+	}
+	// If the start was already in solid there is no good answer, so leave the
+	// requested position alone and let Pmove push it out on the first frame.
+
+	VectorCopy( spot, ent->s.origin );
+	VectorCopy( spot, ent->r.currentOrigin );
+	VectorCopy( spot, ent->s.pos.trBase );
 	ent->s.pos.trType = TR_INTERPOLATE;
 
 	VectorSet( angles, 0, yaw, 0 );
@@ -364,7 +385,7 @@ gentity_t *G_SpawnMonster( const char *name, vec3_t origin, float yaw ) {
 	ent->ai->ps.gravity = g_gravity.value;
 	ent->ai->enemyNum = ENTITYNUM_NONE;
 	ent->ai->state = MSTATE_IDLE;
-	VectorCopy( origin, ent->ai->ps.origin );
+	VectorCopy( spot, ent->ai->ps.origin );
 	VectorCopy( angles, ent->ai->ps.viewangles );
 
 	ent->think = G_MonsterThink;
@@ -413,5 +434,9 @@ void Svcmd_Monster_f( void ) {
 		G_Printf( "unknown monster '%s'\n", name );
 		return;
 	}
-	G_Printf( "spawned %s at %.0f %.0f %.0f\n", name, spot[0], spot[1], spot[2] );
+	// report where it actually landed, which is not where it was asked for
+	// once the drop to the surface has run
+	G_Printf( "spawned %s at %.0f %.0f %.0f\n", name,
+		monster->r.currentOrigin[0], monster->r.currentOrigin[1],
+		monster->r.currentOrigin[2] );
 }
