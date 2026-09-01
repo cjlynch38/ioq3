@@ -53,6 +53,11 @@ vmCvar_t	g_speed;
 
 // Third person camera geometry. CVAR_SYSTEMINFO so the client reads the same
 // numbers the server aims with; cgame registers these names too.
+vmCvar_t	pm_accel;
+vmCvar_t	pm_airaccel;
+vmCvar_t	pm_frict;
+vmCvar_t	pm_stopspd;
+vmCvar_t	pm_jumpvel;
 vmCvar_t	cam_dist;
 vmCvar_t	cam_height;
 vmCvar_t	cam_side;
@@ -144,7 +149,12 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse  },
 
-	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
+	{ &g_speed, "g_speed", "210", 0, 0, qtrue  },
+	{ &pm_accel, "pm_accelerate", "5.5", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &pm_airaccel, "pm_airaccelerate", "0.25", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &pm_frict, "pm_friction", "7", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &pm_stopspd, "pm_stopspeed", "130", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &pm_jumpvel, "pm_jumpvelocity", "240", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &cam_dist, "cam_dist", "110", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &cam_height, "cam_height", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &cam_side, "cam_side", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },

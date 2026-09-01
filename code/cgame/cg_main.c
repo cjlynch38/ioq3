@@ -144,6 +144,11 @@ vmCvar_t	cg_thirdPerson;
 vmCvar_t	cg_thirdPersonRange;
 vmCvar_t	cg_thirdPersonAngle;
 // server owned camera geometry: cgame reads what qagame aims with
+vmCvar_t	pm_accel;
+vmCvar_t	pm_airaccel;
+vmCvar_t	pm_frict;
+vmCvar_t	pm_stopspd;
+vmCvar_t	pm_jumpvel;
 vmCvar_t	cam_dist;
 vmCvar_t	cam_height;
 vmCvar_t	cam_side;
@@ -277,6 +282,11 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_thirdPersonRange, "cg_thirdPersonRange", "40", CVAR_ARCHIVE },
 	{ &cg_thirdPersonAngle, "cg_thirdPersonAngle", "0", CVAR_ARCHIVE },
 	{ &cg_thirdPerson, "cg_thirdPerson", "1", CVAR_ARCHIVE },
+	{ &pm_accel, "pm_accelerate", "5.5", CVAR_SYSTEMINFO | CVAR_ARCHIVE },
+	{ &pm_airaccel, "pm_airaccelerate", "0.25", CVAR_SYSTEMINFO | CVAR_ARCHIVE },
+	{ &pm_frict, "pm_friction", "7", CVAR_SYSTEMINFO | CVAR_ARCHIVE },
+	{ &pm_stopspd, "pm_stopspeed", "130", CVAR_SYSTEMINFO | CVAR_ARCHIVE },
+	{ &pm_jumpvel, "pm_jumpvelocity", "240", CVAR_SYSTEMINFO | CVAR_ARCHIVE },
 	{ &cam_dist, "cam_dist", "110", CVAR_SYSTEMINFO },
 	{ &cam_height, "cam_height", "20", CVAR_SYSTEMINFO },
 	{ &cam_side, "cam_side", "0", CVAR_SYSTEMINFO },

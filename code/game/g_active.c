@@ -921,6 +921,13 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_fixed = pmove_fixed.integer | client->pers.pmoveFixed;
 	pm.pmove_msec = pmove_msec.integer;
 
+	// movement feel; cg_predict.c must set these to exactly the same values
+	pm.pm_accelerate = pm_accel.value;
+	pm.pm_airaccelerate = pm_airaccel.value;
+	pm.pm_friction = pm_frict.value;
+	pm.pm_stopspeed = pm_stopspd.value;
+	pm.pm_jumpvelocity = pm_jumpvel.value;
+
 	VectorCopy( client->ps.origin, client->oldOrigin );
 
 #ifdef MISSIONPACK

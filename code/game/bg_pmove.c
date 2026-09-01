@@ -31,6 +31,9 @@ pmove_t		*pm;
 pml_t		pml;
 
 // movement parameters
+// pm_stopspeed, pm_accelerate, pm_airaccelerate, pm_friction and
+// JUMP_VELOCITY now come in on pmove_t so they can be tuned live; these are
+// only the fallbacks used if a caller leaves them at zero.
 float	pm_stopspeed = 100.0f;
 float	pm_duckScale = 0.25f;
 float	pm_swimScale = 0.50f;
@@ -46,6 +49,26 @@ float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
 int		c_pmove = 0;
+
+// Each of these reads the value the caller put on pmove_t, falling back to the
+// stock Quake 3 number when it is left at zero. pmove_t is memset by both
+// callers, so a forgotten assignment shows up as stock behaviour rather than
+// as a silently one-sided default that only breaks under prediction.
+static ID_INLINE float PM_Friction_Value( void ) {
+	return pm->pm_friction > 0 ? pm->pm_friction : pm_friction;
+}
+static ID_INLINE float PM_StopSpeed_Value( void ) {
+	return pm->pm_stopspeed > 0 ? pm->pm_stopspeed : pm_stopspeed;
+}
+static ID_INLINE float PM_Accelerate_Value( void ) {
+	return pm->pm_accelerate > 0 ? pm->pm_accelerate : pm_accelerate;
+}
+static ID_INLINE float PM_AirAccelerate_Value( void ) {
+	return pm->pm_airaccelerate > 0 ? pm->pm_airaccelerate : pm_airaccelerate;
+}
+static ID_INLINE float PM_JumpVelocity_Value( void ) {
+	return pm->pm_jumpvelocity > 0 ? pm->pm_jumpvelocity : JUMP_VELOCITY;
+}
 
 
 /*
@@ -196,8 +219,8 @@ static void PM_Friction( void ) {
 		if ( pml.walking && !(pml.groundTrace.surfaceFlags & SURF_SLICK) ) {
 			// if getting knocked back, no friction
 			if ( ! (pm->ps->pm_flags & PMF_TIME_KNOCKBACK) ) {
-				control = speed < pm_stopspeed ? pm_stopspeed : speed;
-				drop += control*pm_friction*pml.frametime;
+				control = speed < PM_StopSpeed_Value() ? PM_StopSpeed_Value() : speed;
+				drop += control*PM_Friction_Value()*pml.frametime;
 			}
 		}
 	}
@@ -237,7 +260,12 @@ Handles user intended acceleration
 ==============
 */
 static void PM_Accelerate( vec3_t wishdir, float wishspeed, float accel ) {
-#if 1
+// The q2 style branch below is what gives Quake 3 strafe jumping: acceleration
+// is projected onto the wish direction, so moving sideways while looking
+// forwards adds speed without limit. Correct for an arena shooter, wrong for a
+// grounded dungeon crawler, so we take the other branch. Id's "feels bad" note
+// is about the game they were making, not about the maths.
+#if 0
 	// q2 style
 	int			i;
 	float		addspeed, accelspeed, currentspeed;
@@ -377,7 +405,7 @@ static qboolean PM_CheckJump( void ) {
 	pm->ps->pm_flags |= PMF_JUMP_HELD;
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->velocity[2] = JUMP_VELOCITY;
+	pm->ps->velocity[2] = PM_JumpVelocity_Value();
 	PM_AddEvent( EV_JUMP );
 
 	if ( pm->cmd.forwardmove >= 0 ) {
@@ -633,7 +661,7 @@ static void PM_AirMove( void ) {
 	wishspeed *= scale;
 
 	// not on ground, so little effect on velocity
-	PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
+	PM_Accelerate (wishdir, wishspeed, PM_AirAccelerate_Value());
 
 	// we may have a ground plane that is very steep, even
 	// though we don't have a groundentity
@@ -769,9 +797,9 @@ static void PM_WalkMove( void ) {
 	// when a player gets hit, they temporarily lose
 	// full control, which allows them to be moved a bit
 	if ( ( pml.groundTrace.surfaceFlags & SURF_SLICK ) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
-		accelerate = pm_airaccelerate;
+		accelerate = PM_AirAccelerate_Value();
 	} else {
-		accelerate = pm_accelerate;
+		accelerate = PM_Accelerate_Value();
 	}
 
 	PM_Accelerate (wishdir, wishspeed, accelerate);
@@ -860,8 +888,8 @@ static void PM_NoclipMove( void ) {
 	{
 		drop = 0;
 
-		friction = pm_friction*1.5;	// extra friction
-		control = speed < pm_stopspeed ? pm_stopspeed : speed;
+		friction = PM_Friction_Value()*1.5;	// extra friction
+		control = speed < PM_StopSpeed_Value() ? PM_StopSpeed_Value() : speed;
 		drop += control*friction*pml.frametime;
 
 		// scale the velocity
@@ -887,7 +915,7 @@ static void PM_NoclipMove( void ) {
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
 
-	PM_Accelerate( wishdir, wishspeed, pm_accelerate );
+	PM_Accelerate( wishdir, wishspeed, PM_Accelerate_Value() );
 
 	// move
 	VectorMA (pm->ps->origin, pml.frametime, pm->ps->velocity, pm->ps->origin);

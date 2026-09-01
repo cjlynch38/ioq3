@@ -499,6 +499,14 @@ void CG_PredictPlayerState( void ) {
 	cg_pmove.pmove_fixed = pmove_fixed.integer;// | cg_pmove_fixed.integer;
 	cg_pmove.pmove_msec = pmove_msec.integer;
 
+	// movement feel; g_active.c must set these to exactly the same values or
+	// prediction disagrees with the server and the player rubber bands
+	cg_pmove.pm_accelerate = pm_accel.value;
+	cg_pmove.pm_airaccelerate = pm_airaccel.value;
+	cg_pmove.pm_friction = pm_frict.value;
+	cg_pmove.pm_stopspeed = pm_stopspd.value;
+	cg_pmove.pm_jumpvelocity = pm_jumpvel.value;
+
 	// run cmds
 	moved = qfalse;
 	for ( cmdNum = current - CMD_BACKUP + 1 ; cmdNum <= current ; cmdNum++ ) {

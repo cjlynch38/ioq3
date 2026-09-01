@@ -190,6 +190,15 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
+	// movement feel. These have to be filled in identically by the server
+	// (g_active.c) and the client (cg_predict.c) or prediction will disagree
+	// with the server and the player will rubber band.
+	float		pm_accelerate;
+	float		pm_airaccelerate;
+	float		pm_friction;
+	float		pm_stopspeed;
+	float		pm_jumpvelocity;
+
 	// callbacks to test the world
 	// these will be different functions during game and cgame
 	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
