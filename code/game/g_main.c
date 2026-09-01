@@ -58,6 +58,9 @@ vmCvar_t	pm_airaccel;
 vmCvar_t	pm_frict;
 vmCvar_t	pm_stopspd;
 vmCvar_t	pm_jumpvel;
+vmCvar_t	g_debugMonster;
+vmCvar_t	g_monsterSightRange;
+vmCvar_t	g_monsterStandoff;
 vmCvar_t	cam_dist;
 vmCvar_t	cam_height;
 vmCvar_t	cam_side;
@@ -149,12 +152,19 @@ static cvarTable_t		gameCvarTable[] = {
 
 	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse  },
 
-	{ &g_speed, "g_speed", "210", 0, 0, qtrue  },
-	{ &pm_accel, "pm_accelerate", "5.5", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &pm_airaccel, "pm_airaccelerate", "0.25", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &pm_frict, "pm_friction", "7", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &pm_stopspd, "pm_stopspeed", "130", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &pm_jumpvel, "pm_jumpvelocity", "240", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &g_speed, "g_speed", "240", 0, 0, qtrue  },
+	// Deliberately NOT archived. These are game design constants, not player
+	// preferences: if they are written to the config then any value used for a
+	// one-off experiment silently becomes the permanent default, and the game
+	// quietly plays differently from what the source says.
+	{ &pm_accel, "pm_accelerate", "5.5", CVAR_SYSTEMINFO, 0, qtrue },
+	{ &pm_airaccel, "pm_airaccelerate", "0.25", CVAR_SYSTEMINFO, 0, qtrue },
+	{ &pm_frict, "pm_friction", "7", CVAR_SYSTEMINFO, 0, qtrue },
+	{ &pm_stopspd, "pm_stopspeed", "130", CVAR_SYSTEMINFO, 0, qtrue },
+	{ &pm_jumpvel, "pm_jumpvelocity", "240", CVAR_SYSTEMINFO, 0, qtrue },
+	{ &g_debugMonster, "g_debugMonster", "0", CVAR_CHEAT, 0, qfalse },
+	{ &g_monsterSightRange, "g_monsterSightRange", "1200", 0, 0, qfalse },
+	{ &g_monsterStandoff, "g_monsterStandoff", "56", 0, 0, qfalse },
 	{ &cam_dist, "cam_dist", "110", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &cam_height, "cam_height", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &cam_side, "cam_side", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
@@ -467,6 +477,9 @@ void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	}
 
 	G_InitWorldSession();
+
+	// monsters do not survive a map change or restart
+	G_MonsterClearAI();
 
 	// initialize all entities for this game
 	memset( g_entities, 0, MAX_GENTITIES * sizeof(g_entities[0]) );
@@ -1869,6 +1882,11 @@ void G_RunFrame( int levelTime ) {
 
 		if ( ent->s.eType == ET_MOVER ) {
 			G_RunMover( ent );
+			continue;
+		}
+
+		if ( ent->s.eType == ET_MONSTER ) {
+			G_RunMonster( ent );
 			continue;
 		}
 

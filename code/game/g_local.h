@@ -67,6 +67,26 @@ typedef enum {
 typedef struct gentity_s gentity_t;
 typedef struct gclient_s gclient_t;
 
+#define	MAX_MONSTERS		64
+
+typedef enum {
+	MSTATE_IDLE,
+	MSTATE_CHASE,
+	MSTATE_ATTACK
+} monsterState_t;
+
+// Server side only, never networked. A monster is driven by the real Pmove(),
+// so it needs a playerState of its own and a usercmd to feed it - the same
+// inputs a client would supply, synthesised by the AI instead.
+typedef struct {
+	qboolean		inuse;
+	playerState_t	ps;
+	usercmd_t		cmd;
+	int				state;
+	int				enemyNum;
+	int				lastEnemySeen;	// level.time
+} monsterAI_t;
+
 struct gentity_s {
 	entityState_t	s;				// communicated by server to clients
 	entityShared_t	r;				// shared by both the server system and game
@@ -145,6 +165,7 @@ struct gentity_s {
 
 	// g_monster.c: AI actor state, server side only
 	int			monsterType;
+	monsterAI_t	*ai;
 
 	qboolean	takedamage;
 
@@ -506,6 +527,8 @@ void G_DamageKnockback (gentity_t *targ, gentity_t *inflictor, gentity_t *attack
 // g_monster.c
 //
 gentity_t *G_SpawnMonster( const char *name, vec3_t origin, float yaw );
+void G_RunMonster( gentity_t *ent );
+void G_MonsterClearAI( void );
 void G_MonsterThink( gentity_t *ent );
 void Svcmd_Monster_f( void );
 
@@ -735,6 +758,9 @@ extern	vmCvar_t	pm_airaccel;
 extern	vmCvar_t	pm_frict;
 extern	vmCvar_t	pm_stopspd;
 extern	vmCvar_t	pm_jumpvel;
+extern	vmCvar_t	g_debugMonster;
+extern	vmCvar_t	g_monsterSightRange;
+extern	vmCvar_t	g_monsterStandoff;
 extern	vmCvar_t	cam_dist;
 extern	vmCvar_t	cam_height;
 extern	vmCvar_t	cam_side;

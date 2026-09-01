@@ -28,6 +28,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_shared.h"
 #include "bg_public.h"
 
+// Run speeds are all below the player's g_speed on purpose: a monster that
+// matches the player exactly can never be shaken off, which removes retreating
+// as an option entirely. The gargoyle is the slow bruiser, the skeleton the
+// fast one, and both can be outrun in a straight line.
 // modelPath/skin point at OpenArena's existing player models, which are GPL and
 // already dark-fantasy: a winged stone gargoyle and a skeletal frame. Custom
 // art replaces these later without touching any code.
@@ -38,8 +42,8 @@ static const monsterDef_t bg_monsterDefs[] = {
 		"gargoyle",		// models/players/gargoyle
 		"stone",		// its stone skin variant
 		100,			// health
-		190.0f,			// run speed, a little under the player's
-		120.0f,			// walk speed
+		175.0f,			// run speed
+		110.0f,			// walk speed
 		WP_GAUNTLET		// what it attacks with
 	},
 	{
@@ -48,8 +52,8 @@ static const monsterDef_t bg_monsterDefs[] = {
 		"skelebot",
 		"default",
 		60,
-		210.0f,
-		130.0f,
+		200.0f,			// the fast one, but still losable
+		125.0f,
 		WP_GAUNTLET
 	}
 };
