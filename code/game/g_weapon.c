@@ -58,69 +58,171 @@ GAUNTLET
 */
 
 void Weapon_Gauntlet( gentity_t *ent ) {
+	// The swing has already started, predicted, inside PM_Weapon. All that
+	// happens here is opening the window during which it can connect.
+	G_MeleeStart( ent );
+}
 
+/*
+======================================================================
+
+MELEE
+
+A melee swing is split in two. The swing itself - animation, timing, the
+weaponTime cost - runs inside bg_pmove.c and is predicted on both sides, so the
+character moves the instant the player clicks. Whether it connects is decided
+here, on the server, during the attack's active window, and comes back to the
+client as an event.
+
+Quake 3's gauntlet conflated the two: it fired a single zero width ray at the
+moment of the press and only played an animation if that ray happened to hit.
+======================================================================
+*/
+
+/*
+===============
+G_MeleeStart
+
+Begin a swing. Called from FireWeapon.
+===============
+*/
+void G_MeleeStart( gentity_t *ent ) {
+	ent->client->meleeStartTime = level.time;
+	ent->client->meleeWeapon = ent->s.weapon;
+	ent->client->meleeHitCount = 0;
 }
 
 /*
 ===============
-CheckGauntletAttack
+G_MeleeAlreadyHit
+
+One swing may only damage a given target once, however many of its traces
+happen to land on it.
 ===============
 */
-qboolean CheckGauntletAttack( gentity_t *ent ) {
-	trace_t		tr;
-	vec3_t		end;
-	gentity_t	*tent;
-	gentity_t	*traceEnt;
-	int			damage;
+static qboolean G_MeleeAlreadyHit( gclient_t *client, int entityNum ) {
+	int		i;
 
-	// set aiming directions
-	AngleVectors (ent->client->ps.viewangles, forward, right, up);
-
-	CalcMuzzlePoint ( ent, forward, right, up, muzzle );
-
-	VectorMA (muzzle, 32, forward, end);
-
-	trap_Trace (&tr, muzzle, NULL, NULL, end, ent->s.number, MASK_SHOT);
-	if ( tr.surfaceFlags & SURF_NOIMPACT ) {
-		return qfalse;
+	for ( i = 0; i < client->meleeHitCount; i++ ) {
+		if ( client->meleeHits[i] == entityNum ) {
+			return qtrue;
+		}
 	}
-
-	if ( ent->client->noclip ) {
-		return qfalse;
+	if ( client->meleeHitCount < ARRAY_LEN( client->meleeHits ) ) {
+		client->meleeHits[ client->meleeHitCount++ ] = entityNum;
 	}
-
-	traceEnt = &g_entities[ tr.entityNum ];
-
-	// send blood impact
-	if ( traceEnt->takedamage && traceEnt->client ) {
-		tent = G_TempEntity( tr.endpos, EV_MISSILE_HIT );
-		tent->s.otherEntityNum = traceEnt->s.number;
-		tent->s.eventParm = DirToByte( tr.plane.normal );
-		tent->s.weapon = ent->s.weapon;
-	}
-
-	if ( !traceEnt->takedamage) {
-		return qfalse;
-	}
-
-	if (ent->client->ps.powerups[PW_QUAD] ) {
-		G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
-		s_quadFactor = g_quadfactor.value;
-	} else {
-		s_quadFactor = 1;
-	}
-#ifdef MISSIONPACK
-	if( ent->client->persistantPowerup && ent->client->persistantPowerup->item && ent->client->persistantPowerup->item->giTag == PW_DOUBLER ) {
-		s_quadFactor *= 2;
-	}
-#endif
-
-	damage = 50 * s_quadFactor;
-	G_Damage( traceEnt, ent, ent, forward, tr.endpos,
-		damage, 0, MOD_GAUNTLET );
-
-	return qtrue;
+	return qfalse;
 }
+
+/*
+===============
+G_MeleeUpdate
+
+Run once per client frame. Does nothing outside the attack's active window.
+===============
+*/
+void G_MeleeUpdate( gentity_t *ent ) {
+	const meleeAttack_t	*atk;
+	gclient_t	*client;
+	gentity_t	*traceEnt, *tent;
+	trace_t		tr;
+	vec3_t		angles, dir, end, mins, maxs;
+	vec3_t		swingForward, swingRight, swingUp;
+	int			elapsed, i, damage;
+	float		yaw;
+
+	client = ent->client;
+	if ( !client || !client->meleeStartTime ) {
+		return;
+	}
+
+	atk = BG_MeleeAttackForWeapon( client->meleeWeapon );
+	if ( !atk ) {
+		client->meleeStartTime = 0;
+		return;
+	}
+
+	elapsed = level.time - client->meleeStartTime;
+
+	if ( elapsed >= atk->windup + atk->active ) {
+		client->meleeStartTime = 0;		// arc has closed
+		return;
+	}
+	if ( elapsed < atk->windup ) {
+		return;							// still winding up
+	}
+	if ( client->noclip ) {
+		return;
+	}
+
+	VectorSet( mins, -atk->radius, -atk->radius, -atk->radius );
+	VectorSet( maxs,  atk->radius,  atk->radius,  atk->radius );
+
+	// Fan several traces across the arc rather than firing one ray down the
+	// centre. A single ray slips past anything not dead ahead, which is what
+	// makes stock gauntlet feel like it is ignoring you.
+	for ( i = 0; i < atk->rays; i++ ) {
+		if ( atk->rays > 1 ) {
+			yaw = -atk->arc * 0.5f + atk->arc * i / ( atk->rays - 1 );
+		} else {
+			yaw = 0;
+		}
+
+		VectorCopy( ent->client->ps.viewangles, angles );
+		angles[YAW] += yaw;
+		AngleVectors( angles, swingForward, swingRight, swingUp );
+
+		CalcMuzzlePoint( ent, swingForward, swingRight, swingUp, muzzle );
+		VectorMA( muzzle, atk->range, swingForward, end );
+
+		trap_Trace( &tr, muzzle, mins, maxs, end, ent->s.number, MASK_SHOT );
+
+		if ( g_debugDamage.integer && tr.entityNum != ENTITYNUM_NONE
+			&& tr.entityNum != ENTITYNUM_WORLD ) {
+			G_Printf( "melee: client %i ray %i at t+%ims connected with entity %i\n",
+				ent->s.number, i, elapsed, tr.entityNum );
+		}
+
+		if ( tr.surfaceFlags & SURF_NOIMPACT ) {
+			continue;
+		}
+		if ( tr.entityNum == ENTITYNUM_NONE || tr.entityNum == ENTITYNUM_WORLD ) {
+			continue;
+		}
+
+		traceEnt = &g_entities[ tr.entityNum ];
+		if ( !traceEnt->takedamage ) {
+			continue;
+		}
+		if ( G_MeleeAlreadyHit( client, tr.entityNum ) ) {
+			continue;
+		}
+
+		if ( traceEnt->client ) {
+			tent = G_TempEntity( tr.endpos, EV_MISSILE_HIT );
+			tent->s.otherEntityNum = traceEnt->s.number;
+			tent->s.eventParm = DirToByte( tr.plane.normal );
+			tent->s.weapon = ent->s.weapon;
+		}
+
+		if ( ent->client->ps.powerups[PW_QUAD] ) {
+			G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
+			s_quadFactor = g_quadfactor.value;
+		} else {
+			s_quadFactor = 1;
+		}
+
+		damage = atk->damage * s_quadFactor;
+
+		// Push along the swing, not along the surface normal, and with a
+		// knockback figure that is nothing to do with the damage number.
+		VectorCopy( swingForward, dir );
+		G_DamageKnockback( traceEnt, ent, ent, dir, tr.endpos,
+			damage, atk->knockback, 0, atk->mod );
+	}
+}
+
+
 
 
 /*

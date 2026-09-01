@@ -171,7 +171,6 @@ typedef struct {
 	int			tracemask;			// collide against these types of surfaces
 	int			debugLevel;			// if set, diagnostic output will be printed
 	qboolean	noFootsteps;		// if the game is setup for no footsteps by the server
-	qboolean	gauntletHit;		// true if a gauntlet attack would actually hit something
 
 	int			framecount;
 
@@ -713,6 +712,24 @@ void	BG_EvaluateTrajectoryDelta( const trajectory_t *tr, int atTime, vec3_t resu
 void	BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerState_t *ps );
 
 void	BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad );
+
+// bg_melee.c -- melee attacks, shared so the swing can be client predicted
+typedef struct {
+	int		weapon;			// WP_*
+	int		windup;			// ms from the swing starting to it being able to connect
+	int		active;			// ms the arc can connect for
+	int		recover;		// ms after the arc closes before another swing
+	float	range;
+	float	arc;			// total horizontal sweep, degrees
+	int		rays;			// traces fanned across the arc
+	float	radius;			// trace box half size
+	int		damage;
+	int		knockback;		// separate from damage on purpose
+	int		mod;			// meansOfDeath
+} meleeAttack_t;
+
+const meleeAttack_t	*BG_MeleeAttackForWeapon( int weapon );
+int		BG_MeleeSwingTime( const meleeAttack_t *atk );
 
 // bg_camera.c -- third person camera geometry shared by cgame and qagame
 void	BG_CameraViewSource( const playerState_t *ps, const vec3_t viewangles,

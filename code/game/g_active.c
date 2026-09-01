@@ -863,13 +863,6 @@ void ClientThink_real( gentity_t *ent ) {
 
 	memset (&pm, 0, sizeof(pm));
 
-	// check for the hit-scan gauntlet, don't let the action
-	// go through as an attack unless it actually hits something
-	if ( client->ps.weapon == WP_GAUNTLET && !( ucmd->buttons & BUTTON_TALK ) &&
-		( ucmd->buttons & BUTTON_ATTACK ) && client->ps.weaponTime <= 0 ) {
-		pm.gauntletHit = CheckGauntletAttack( ent );
-	}
-
 	if ( ent->flags & FL_FORCE_GESTURE ) {
 		ent->flags &= ~FL_FORCE_GESTURE;
 		ent->client->pers.cmd.buttons |= BUTTON_GESTURE;
@@ -978,6 +971,12 @@ void ClientThink_real( gentity_t *ent ) {
 
 	// link entity now, after any personal teleporters have been used
 	trap_LinkEntity (ent);
+
+	// Resolve any melee swing that is inside its active window. After
+	// ClientEvents, so a swing that started this frame gets its windup
+	// respected rather than landing instantly, and after LinkEntity so the
+	// traces run against up to date positions.
+	G_MeleeUpdate( ent );
 	if ( !ent->client->noclip ) {
 		G_TouchTriggers( ent );
 	}

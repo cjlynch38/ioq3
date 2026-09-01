@@ -1564,6 +1564,7 @@ Generates weapon events and modifes the weapon counter
 */
 static void PM_Weapon( void ) {
 	int		addTime;
+	const meleeAttack_t	*meleeAtk;
 
 	// don't allow attack until all buttons are up
 	if ( pm->ps->pm_flags & PMF_RESPAWNED ) {
@@ -1640,14 +1641,16 @@ static void PM_Weapon( void ) {
 		return;
 	}
 
-	// start the animation even if out of ammo
-	if ( pm->ps->weapon == WP_GAUNTLET ) {
-		// the guantlet only "fires" when it actually hits something
-		if ( !pm->gauntletHit ) {
-			pm->ps->weaponTime = 0;
-			pm->ps->weaponstate = WEAPON_READY;
-			return;
-		}
+	// Start the animation even if out of ammo.
+	//
+	// Quake 3 made the gauntlet a special case here: it only played the swing
+	// if the server had already decided the blow connected, which meant no
+	// animation at all until a round trip had completed and none whatsoever on
+	// a miss. That is why melee felt dead. The swing is now unconditional and
+	// fully predicted; whether it *hits* stays server authoritative and comes
+	// back as an event.
+	meleeAtk = BG_MeleeAttackForWeapon( pm->ps->weapon );
+	if ( meleeAtk ) {
 		PM_StartTorsoAnim( TORSO_ATTACK2 );
 	} else {
 		PM_StartTorsoAnim( TORSO_ATTACK );
@@ -1669,6 +1672,12 @@ static void PM_Weapon( void ) {
 
 	// fire weapon
 	PM_AddEvent( EV_FIRE_WEAPON );
+
+	if ( meleeAtk ) {
+		addTime = BG_MeleeSwingTime( meleeAtk );
+		pm->ps->weaponTime += addTime;
+		return;
+	}
 
 	switch( pm->ps->weapon ) {
 	default:

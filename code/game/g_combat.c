@@ -801,6 +801,23 @@ dflags		these flags are used to control how T_Damage works
 
 void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			   vec3_t dir, vec3_t point, int damage, int dflags, int mod ) {
+	// stock behaviour: knockback equals damage
+	G_DamageKnockback( targ, inflictor, attacker, dir, point, damage, damage, dflags, mod );
+}
+
+/*
+============
+G_DamageKnockback
+
+As G_Damage, but with the knockback impulse separated from the damage number.
+
+Quake 3 ties the two together, which is fine when every weapon is a gun but
+wrong for melee: a heavy overhead swing should shove far harder than a fast jab
+of the same damage, and a poison tick should not shove at all.
+============
+*/
+void G_DamageKnockback( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
+			   vec3_t dir, vec3_t point, int damage, int knockbackAmount, int dflags, int mod ) {
 	gclient_t	*client;
 	int			take;
 	int			asave;
@@ -874,9 +891,12 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		VectorNormalize(dir);
 	}
 
-	knockback = damage;
+	knockback = knockbackAmount;
 	if ( knockback > 200 ) {
 		knockback = 200;
+	}
+	if ( knockback < 0 ) {
+		knockback = 0;
 	}
 	if ( targ->flags & FL_NO_KNOCKBACK ) {
 		knockback = 0;

@@ -316,6 +316,14 @@ struct gclient_s {
 	int			invulnerabilityTime;
 #endif
 
+	// Melee swing in progress. Server side only and never networked: the swing
+	// itself is predicted from bg_pmove.c, but whether it connects is decided
+	// here and sent back as an event.
+	int			meleeStartTime;			// level.time the swing began, 0 if idle
+	int			meleeWeapon;
+	int			meleeHitCount;
+	int			meleeHits[MAX_CLIENTS];	// dedupe, so one swing hits a target once
+
 	char		*areabits;
 };
 
@@ -490,6 +498,9 @@ const char *BuildShaderStateConfig( void );
 //
 qboolean CanDamage (gentity_t *targ, vec3_t origin);
 void G_Damage (gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_t dir, vec3_t point, int damage, int dflags, int mod);
+void G_DamageKnockback (gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_t dir, vec3_t point, int damage, int knockbackAmount, int dflags, int mod);
+void G_MeleeStart( gentity_t *ent );
+void G_MeleeUpdate( gentity_t *ent );
 qboolean G_RadiusDamage (vec3_t origin, gentity_t *attacker, float damage, float radius, gentity_t *ignore, int mod);
 int G_InvulnerabilityEffect( gentity_t *targ, vec3_t dir, vec3_t point, vec3_t impactpoint, vec3_t bouncedir );
 void body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
@@ -552,7 +563,6 @@ void DropPortalDestination( gentity_t *ent );
 qboolean LogAccuracyHit( gentity_t *target, gentity_t *attacker );
 void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint );
 void SnapVectorTowards( vec3_t v, vec3_t to );
-qboolean CheckGauntletAttack( gentity_t *ent );
 void Weapon_HookFree (gentity_t *ent);
 void Weapon_HookThink (gentity_t *ent);
 
