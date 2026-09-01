@@ -1054,6 +1054,12 @@ typedef struct {
 
 	clientInfo_t	clientinfo[MAX_CLIENTS];
 
+	// Monsters share the player model pipeline, so their models, skins and
+	// animations live in a clientInfo_t too - one per monster type rather than
+	// one per client.
+	clientInfo_t	monsterinfo[MONSTER_NUM_TYPES];
+
+
 	// teamchat width is *3 because of embedded color codes
 	char			teamChatMsgs[TEAMCHAT_HEIGHT][TEAMCHAT_WIDTH*3+1];
 	int				teamChatMsgTimes[TEAMCHAT_HEIGHT];
@@ -1337,6 +1343,17 @@ void CG_Player( centity_t *cent );
 void CG_ResetPlayerEntity( centity_t *cent );
 void CG_AddRefEntityWithPowerups( refEntity_t *ent, entityState_t *state, int team );
 void CG_NewClientInfo( int clientNum );
+qboolean CG_RegisterClientModelname( clientInfo_t *ci, const char *modelName, const char *skinName, const char *headModelName, const char *headSkinName, const char *teamName );
+clientInfo_t *CG_ClientInfoForEntity( centity_t *cent );
+void CG_PlayerAnimation( centity_t *cent, int *legsOld, int *legs, float *legsBackLerp,
+				int *torsoOld, int *torso, float *torsoBackLerp );
+qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane );
+
+//
+// cg_monsters.c
+//
+clientInfo_t *CG_MonsterInfo( int type );
+void CG_Monster( centity_t *cent );
 sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName );
 
 //

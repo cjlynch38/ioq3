@@ -143,6 +143,9 @@ struct gentity_s {
 
 	int			health;
 
+	// g_monster.c: AI actor state, server side only
+	int			monsterType;
+
 	qboolean	takedamage;
 
 	int			damage;
@@ -499,6 +502,13 @@ const char *BuildShaderStateConfig( void );
 qboolean CanDamage (gentity_t *targ, vec3_t origin);
 void G_Damage (gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_t dir, vec3_t point, int damage, int dflags, int mod);
 void G_DamageKnockback (gentity_t *targ, gentity_t *inflictor, gentity_t *attacker, vec3_t dir, vec3_t point, int damage, int knockbackAmount, int dflags, int mod);
+//
+// g_monster.c
+//
+gentity_t *G_SpawnMonster( const char *name, vec3_t origin, float yaw );
+void G_MonsterThink( gentity_t *ent );
+void Svcmd_Monster_f( void );
+
 void G_MeleeStart( gentity_t *ent );
 void G_MeleeUpdate( gentity_t *ent );
 qboolean G_RadiusDamage (vec3_t origin, gentity_t *attacker, float damage, float radius, gentity_t *ignore, int mod);

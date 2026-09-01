@@ -468,6 +468,11 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	if (Q_stricmp (cmd, "monster") == 0) {
+		Svcmd_Monster_f();
+		return qtrue;
+	}
+
 	if (Q_stricmp (cmd, "addbot") == 0) {
 		Svcmd_AddBot_f();
 		return qtrue;

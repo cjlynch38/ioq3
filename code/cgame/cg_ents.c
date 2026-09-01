@@ -1035,6 +1035,9 @@ static void CG_AddCEntity( centity_t *cent ) {
 	case ET_GRAPPLE:
 		CG_Grapple( cent );
 		break;
+	case ET_MONSTER:
+		CG_Monster( cent );
+		break;
 	case ET_TEAM:
 		CG_TeamBase( cent );
 		break;

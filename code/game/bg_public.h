@@ -698,6 +698,7 @@ typedef enum {
 	ET_INVISIBLE,
 	ET_GRAPPLE,				// grapple hooked on wall
 	ET_TEAM,
+	ET_MONSTER,			// AI actor: like ET_PLAYER but not backed by a client slot
 
 	ET_EVENTS				// any of the EV_* events can be added freestanding
 							// by setting eType to ET_EVENTS + eventNum
@@ -712,6 +713,29 @@ void	BG_EvaluateTrajectoryDelta( const trajectory_t *tr, int atTime, vec3_t resu
 void	BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerState_t *ps );
 
 void	BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad );
+
+// bg_monsters.c -- monster definitions, shared so the client and server agree
+// on what each monster is
+typedef enum {
+	MONSTER_GARGOYLE,
+	MONSTER_SKELETON,
+
+	MONSTER_NUM_TYPES
+} monsterType_t;
+
+typedef struct {
+	int			type;
+	const char	*name;			// spawn name, e.g. "gargoyle"
+	const char	*modelPath;		// under models/players/
+	const char	*skin;
+	int			health;
+	float		runSpeed;
+	float		walkSpeed;
+	int			weapon;			// what it attacks with
+} monsterDef_t;
+
+const monsterDef_t	*BG_MonsterDefByType( int type );
+const monsterDef_t	*BG_MonsterDefByName( const char *name );
 
 // bg_melee.c -- melee attacks, shared so the swing can be client predicted
 typedef struct {

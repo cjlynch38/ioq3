@@ -9,6 +9,7 @@ set(CGAME_SOURCES
     ${SOURCE_DIR}/cgame/cg_main.c
     ${SOURCE_DIR}/game/bg_camera.c
     ${SOURCE_DIR}/game/bg_melee.c
+    ${SOURCE_DIR}/game/bg_monsters.c
     ${SOURCE_DIR}/game/bg_misc.c
     ${SOURCE_DIR}/game/bg_pmove.c
     ${SOURCE_DIR}/game/bg_slidemove.c
@@ -23,6 +24,7 @@ set(CGAME_SOURCES
     ${SOURCE_DIR}/cgame/cg_localents.c
     ${SOURCE_DIR}/cgame/cg_marks.c
     ${SOURCE_DIR}/cgame/cg_particles.c
+    ${SOURCE_DIR}/cgame/cg_monsters.c
     ${SOURCE_DIR}/cgame/cg_players.c
     ${SOURCE_DIR}/cgame/cg_playerstate.c
     ${SOURCE_DIR}/cgame/cg_predict.c
@@ -47,6 +49,7 @@ set(GAME_SOURCES
     ${SOURCE_DIR}/game/ai_vcmd.c
     ${SOURCE_DIR}/game/bg_camera.c
     ${SOURCE_DIR}/game/bg_melee.c
+    ${SOURCE_DIR}/game/bg_monsters.c
     ${SOURCE_DIR}/game/bg_misc.c
     ${SOURCE_DIR}/game/bg_pmove.c
     ${SOURCE_DIR}/game/bg_slidemove.c
@@ -59,6 +62,7 @@ set(GAME_SOURCES
     ${SOURCE_DIR}/game/g_combat.c
     ${SOURCE_DIR}/game/g_items.c
     ${SOURCE_DIR}/game/g_mem.c
+    ${SOURCE_DIR}/game/g_monster.c
     ${SOURCE_DIR}/game/g_misc.c
     ${SOURCE_DIR}/game/g_missile.c
     ${SOURCE_DIR}/game/g_mover.c
