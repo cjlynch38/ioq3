@@ -127,6 +127,17 @@ set(CGAME_SOURCES_BASEGAME ${CGAME_SOURCES} ${GAME_MODULE_SHARED_SOURCES})
 set(GAME_SOURCES_BASEGAME ${GAME_SOURCES} ${GAME_MODULE_SHARED_SOURCES})
 set(UI_SOURCES_BASEGAME ${UI_SOURCES} ${GAME_MODULE_SHARED_SOURCES})
 
+# The game modules must agree with the engine on BASEGAME: GAME_VERSION derives from it
+# and is checked as a configstring, so a mismatch is a "Client/Server game mismatch" error.
+set(GAME_MODULE_DEFINITIONS "")
+if(BUILD_STANDALONE)
+    list(APPEND GAME_MODULE_DEFINITIONS STANDALONE)
+endif()
+
+# Copy built game modules into a live game directory so the engine can load them
+# as native DLLs (FS_FindVM only finds DLLs in loose directories, never in pk3s).
+set(GAME_DEPLOY_DIR "" CACHE PATH "Copy built game modules here after each build")
+
 if(BUILD_GAME_LIBRARIES)
     set(CGAME_MODULE_BINARY ${CGAME_MODULE})
     set(GAME_MODULE_BINARY ${GAME_MODULE})
@@ -137,22 +148,33 @@ if(BUILD_GAME_LIBRARIES)
     set(UI_MODULE_BINARY_BASEGAME ${UI_MODULE_BINARY}_${BASEGAME})
 
     add_library(                ${CGAME_MODULE_BINARY_BASEGAME} SHARED ${CGAME_SOURCES_BASEGAME} ${CGAME_BINARY_SOURCES})
-    target_compile_definitions( ${CGAME_MODULE_BINARY_BASEGAME} PRIVATE CGAME)
+    target_compile_definitions( ${CGAME_MODULE_BINARY_BASEGAME} PRIVATE CGAME ${GAME_MODULE_DEFINITIONS})
     target_link_libraries(      ${CGAME_MODULE_BINARY_BASEGAME} PRIVATE ${COMMON_LIBRARIES})
     set_target_properties(      ${CGAME_MODULE_BINARY_BASEGAME} PROPERTIES OUTPUT_NAME ${CGAME_MODULE_BINARY})
     set_output_dirs(            ${CGAME_MODULE_BINARY_BASEGAME} SUBDIRECTORY ${BASEGAME})
 
     add_library(                ${GAME_MODULE_BINARY_BASEGAME} SHARED ${GAME_SOURCES_BASEGAME} ${GAME_BINARY_SOURCES})
-    target_compile_definitions( ${GAME_MODULE_BINARY_BASEGAME} PRIVATE QAGAME)
+    target_compile_definitions( ${GAME_MODULE_BINARY_BASEGAME} PRIVATE QAGAME ${GAME_MODULE_DEFINITIONS})
     target_link_libraries(      ${GAME_MODULE_BINARY_BASEGAME} PRIVATE ${COMMON_LIBRARIES})
     set_target_properties(      ${GAME_MODULE_BINARY_BASEGAME} PROPERTIES OUTPUT_NAME ${GAME_MODULE_BINARY})
     set_output_dirs(            ${GAME_MODULE_BINARY_BASEGAME} SUBDIRECTORY ${BASEGAME})
 
     add_library(                ${UI_MODULE_BINARY_BASEGAME} SHARED ${UI_SOURCES_BASEGAME} ${UI_BINARY_SOURCES})
-    target_compile_definitions( ${UI_MODULE_BINARY_BASEGAME} PRIVATE UI)
+    target_compile_definitions( ${UI_MODULE_BINARY_BASEGAME} PRIVATE UI ${GAME_MODULE_DEFINITIONS})
     target_link_libraries(      ${UI_MODULE_BINARY_BASEGAME} PRIVATE ${COMMON_LIBRARIES})
     set_target_properties(      ${UI_MODULE_BINARY_BASEGAME} PROPERTIES OUTPUT_NAME ${UI_MODULE_BINARY})
     set_output_dirs(            ${UI_MODULE_BINARY_BASEGAME} SUBDIRECTORY ${BASEGAME})
+
+    if(GAME_DEPLOY_DIR)
+        foreach(MODULE_TARGET ${CGAME_MODULE_BINARY_BASEGAME}
+                              ${GAME_MODULE_BINARY_BASEGAME}
+                              ${UI_MODULE_BINARY_BASEGAME})
+            add_custom_command(TARGET ${MODULE_TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${GAME_DEPLOY_DIR}
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        $<TARGET_FILE:${MODULE_TARGET}> ${GAME_DEPLOY_DIR})
+        endforeach()
+    endif()
 endif()
 
 if(BUILD_GAME_QVMS)
@@ -161,19 +183,19 @@ if(BUILD_GAME_QVMS)
     set(UI_MODULE_QVM_BASEGAME ${UI_MODULE}qvm_${BASEGAME})
 
     add_qvm(${CGAME_MODULE_QVM_BASEGAME}
-        DEFINITIONS CGAME
+        DEFINITIONS CGAME ${GAME_MODULE_DEFINITIONS}
         OUTPUT_NAME ${CGAME_MODULE}
         OUTPUT_DIRECTORY ${BASEGAME}/vm
         SOURCES ${CGAME_SOURCES_BASEGAME} ${CGAME_QVM_SOURCES})
 
     add_qvm(${GAME_MODULE_QVM_BASEGAME}
-        DEFINITIONS QAGAME
+        DEFINITIONS QAGAME ${GAME_MODULE_DEFINITIONS}
         OUTPUT_NAME ${GAME_MODULE}
         OUTPUT_DIRECTORY ${BASEGAME}/vm
         SOURCES ${GAME_SOURCES_BASEGAME} ${GAME_QVM_SOURCES})
 
     add_qvm(${UI_MODULE_QVM_BASEGAME}
-        DEFINITIONS UI
+        DEFINITIONS UI ${GAME_MODULE_DEFINITIONS}
         OUTPUT_NAME ${UI_MODULE}
         OUTPUT_DIRECTORY ${BASEGAME}/vm
         SOURCES ${UI_SOURCES_BASEGAME} ${UI_QVM_SOURCES})

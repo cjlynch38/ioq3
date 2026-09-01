@@ -101,7 +101,8 @@ include(renderer_gl1)
 include(renderer_gl2)
 include(client)
 include(basegame)
-include(missionpack)
+# missionpack (Team Arena) is not part of this game; dropping it halves the build.
+#include(missionpack)
 
 include(post_configure)
 include(installer)
