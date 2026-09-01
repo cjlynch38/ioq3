@@ -495,7 +495,8 @@ static void CG_MapRestart( void ) {
 		}
 	}
 #endif
-	trap_Cvar_Set("cg_thirdPerson", "0");
+	// (stock Q3 forced cg_thirdPerson back to 0 here; third person is the
+	// normal play mode now, so it must survive a map restart)
 }
 
 #ifdef MISSIONPACK

@@ -218,93 +218,205 @@ static void CG_CalcVrect (void) {
 
 /*
 ===============
-CG_OffsetThirdPersonView
+CG_StepOffsetAmount
 
+Vertical distance to subtract from the view origin to smooth out stair
+climbing. Shared by the first and third person views.
 ===============
 */
-#define	FOCUS_DISTANCE	512
+static float CG_StepOffsetAmount( void ) {
+	int		timeDelta;
+
+	timeDelta = cg.time - cg.stepTime;
+	if ( timeDelta < STEP_TIME ) {
+		return cg.stepChange * (STEP_TIME - timeDelta) / STEP_TIME;
+	}
+	return 0;
+}
+
+/*
+===============
+CG_DuckOffsetAmount
+
+Vertical distance to subtract from the view origin to smooth out the
+viewheight change when crouching and standing.
+===============
+*/
+static float CG_DuckOffsetAmount( void ) {
+	int		timeDelta;
+
+	timeDelta = cg.time - cg.duckTime;
+	if ( timeDelta < DUCK_TIME ) {
+		return cg.duckChange * (DUCK_TIME - timeDelta) / DUCK_TIME;
+	}
+	return 0;
+}
+
+/*
+===============
+CG_CameraLagFraction
+
+Frame rate independent smoothing fraction for a given follow speed. Clamped to
+1 so a long frame can never overshoot the target.
+
+Deliberately linear rather than exponential: bg_lib.c (the QVM libc) has no
+exp(), so an exponential filter would build as a native DLL and then fail to
+link as a QVM.
+===============
+*/
+static float CG_CameraLagFraction( float speed, int msec ) {
+	float	frac;
+
+	frac = speed * msec * 0.001f;
+	if ( frac > 1.0f ) {
+		frac = 1.0f;
+	}
+	if ( frac < 0.0f ) {
+		frac = 0.0f;
+	}
+	return frac;
+}
+
+/*
+===============
+CG_OffsetThirdPersonView
+
+Spring arm third person camera.
+
+The anchor is the player's eye, smoothed over time and carrying the same stair
+and crouch smoothing the first person view uses. The boom hangs off it at a
+fixed offset and collides with the world: it pulls in instantly so the camera
+can never end up inside geometry, but extends back out gradually so leaving a
+tight space is a glide rather than a snap.
+
+Camera angles are the player's view angles unmodified, so what you aim is what
+you see. (Stock Q3 halved the pitch and re-derived it from a focus point 512
+units ahead, which made vertical aim mushy and nonlinear.)
+===============
+*/
 static void CG_OffsetThirdPersonView( void ) {
 	vec3_t		forward, right, up;
-	vec3_t		view;
-	vec3_t		focusAngles;
+	vec3_t		anchor, delta;
+	vec3_t		boomStart, boomEnd, boomDir;
+	vec3_t		camMins, camMaxs;
 	trace_t		trace;
-	static vec3_t	mins = { -4, -4, -4 };
-	static vec3_t	maxs = { 4, 4, 4 };
-	vec3_t		focusPoint;
-	float		focusDist;
-	float		forwardScale, sideScale;
+	float		wanted, allowed, radius;
+	float		lagXY, lagZ, offsetScale;
+	int			contentMask;
+	int			msec;
+	int			pass;
 
-	cg.refdef.vieworg[2] += cg.predictedPlayerState.viewheight;
+	msec = cg.frametime;
+	if ( msec < 1 ) {
+		msec = 1;
+	} else if ( msec > 200 ) {
+		msec = 200;
+	}
 
-	VectorCopy( cg.refdefViewAngles, focusAngles );
-
-	// if dead, look at killer
+	// if dead, look at the killer
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
-		focusAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
 		cg.refdefViewAngles[YAW] = cg.predictedPlayerState.stats[STAT_DEAD_YAW];
 	}
 
-	if ( focusAngles[PITCH] > 45 ) {
-		focusAngles[PITCH] = 45;		// don't go too far overhead
+	// the anchor is the eye, with stair and crouch smoothing applied
+	VectorCopy( cg.refdef.vieworg, anchor );
+	anchor[2] += cg.predictedPlayerState.viewheight;
+	anchor[2] -= CG_StepOffsetAmount();
+	anchor[2] -= CG_DuckOffsetAmount();
+
+	VectorSubtract( anchor, cg.camAnchor, delta );
+
+	// snap rather than smear on a teleport, a respawn, or any large jump
+	if ( !cg.camValid || cg.thisFrameTeleport || VectorLength( delta ) > 64 ) {
+		VectorCopy( anchor, cg.camAnchor );
+		cg.camDist = cg_cam_dist.value;
+		cg.camValid = qtrue;
+	} else {
+		// vertical follow is deliberately faster than horizontal: too slow and
+		// the camera sinks through the floor when you land
+		lagXY = CG_CameraLagFraction( cg_cam_followSpeed.value, msec );
+		lagZ  = CG_CameraLagFraction( cg_cam_followSpeedZ.value, msec );
+		cg.camAnchor[0] += delta[0] * lagXY;
+		cg.camAnchor[1] += delta[1] * lagXY;
+		cg.camAnchor[2] += delta[2] * lagZ;
 	}
-	AngleVectors( focusAngles, forward, NULL, NULL );
-
-	VectorMA( cg.refdef.vieworg, FOCUS_DISTANCE, forward, focusPoint );
-
-	VectorCopy( cg.refdef.vieworg, view );
-
-	view[2] += 8;
-
-	cg.refdefViewAngles[PITCH] *= 0.5;
 
 	AngleVectors( cg.refdefViewAngles, forward, right, up );
 
-	forwardScale = cos( cg_thirdPersonAngle.value / 180 * M_PI );
-	sideScale = sin( cg_thirdPersonAngle.value / 180 * M_PI );
-	VectorMA( view, -cg_thirdPersonRange.value * forwardScale, forward, view );
-	VectorMA( view, -cg_thirdPersonRange.value * sideScale, right, view );
+	radius = cg_cam_radius.value;
+	VectorSet( camMins, -radius, -radius, -radius );
+	VectorSet( camMaxs,  radius,  radius,  radius );
 
-	// trace a ray from the origin to the viewpoint to make sure the view isn't
-	// in a solid block.  Use an 8 by 8 block to prevent the view from near clipping anything
+	contentMask = MASK_SOLID;
+	if ( cg_cam_clipBodies.integer ) {
+		contentMask |= CONTENTS_BODY;
+	}
 
-	if (!cg_cameraMode.integer) {
-		CG_Trace( &trace, cg.refdef.vieworg, mins, maxs, view, cg.predictedPlayerState.clientNum, MASK_SOLID );
+	// Two passes. The first finds how much room there is behind the character
+	// with the full shoulder offset; the second rebuilds the target with the
+	// offset scaled by that result, so a camera forced in close ends up
+	// directly behind the character instead of jammed into a side wall.
+	offsetScale = 1.0f;
 
-		if ( trace.fraction != 1.0 ) {
-			VectorCopy( trace.endpos, view );
-			view[2] += (1.0 - trace.fraction) * 32;
-			// try another trace to this position, because a tunnel may have the ceiling
-			// close enough that this is poking out
+	for ( pass = 0; pass < 2; pass++ ) {
+		// the ideal camera spot: back along the view axis, offset to the
+		// shoulder and raised a little
+		VectorCopy( cg.camAnchor, boomStart );
+		VectorMA( boomStart, cg_cam_side.value * offsetScale, right, boomStart );
+		boomStart[2] += cg_cam_height.value * offsetScale;
+		VectorMA( boomStart, -cg_cam_dist.value, forward, boomEnd );
 
-			CG_Trace( &trace, cg.refdef.vieworg, mins, maxs, view, cg.predictedPlayerState.clientNum, MASK_SOLID );
-			VectorCopy( trace.endpos, view );
+		VectorSubtract( boomEnd, cg.camAnchor, boomDir );
+		wanted = VectorNormalize( boomDir );
+		if ( wanted < 1 ) {
+			wanted = 1;
 		}
+
+		// Collide along the whole segment from the eye to that spot rather
+		// than treating the shoulder offset and the pull-back separately. The
+		// camera then slides toward the character along one line, so it
+		// degrades gracefully in tight spaces instead of jamming a corner.
+		if ( cg_cameraMode.integer ) {
+			allowed = wanted;
+			break;		// cinematic camera: no collision at all
+		}
+
+		CG_Trace( &trace, cg.camAnchor, camMins, camMaxs, boomEnd,
+			cg.predictedPlayerState.clientNum, contentMask );
+		allowed = wanted * trace.fraction;
+
+		if ( trace.fraction >= 1.0f ) {
+			break;		// nothing in the way, the full offset is fine
+		}
+		offsetScale = trace.fraction;
 	}
 
-
-	VectorCopy( view, cg.refdef.vieworg );
-
-	// select pitch to look at focus point from vieword
-	VectorSubtract( focusPoint, cg.refdef.vieworg, focusPoint );
-	focusDist = sqrt( focusPoint[0] * focusPoint[0] + focusPoint[1] * focusPoint[1] );
-	if ( focusDist < 1 ) {
-		focusDist = 1;	// should never happen
+	// Never come closer than the player's own hull, or the camera ends up
+	// inside the character and near clips them out of the picture entirely.
+	// Clipping a little way into a wall is the lesser evil here, and is what
+	// most third person games choose.
+	if ( allowed < cg_cam_minDist.value ) {
+		allowed = cg_cam_minDist.value;
 	}
-	cg.refdefViewAngles[PITCH] = -180 / M_PI * atan2( focusPoint[2], focusDist );
-	cg.refdefViewAngles[YAW] -= cg_thirdPersonAngle.value;
+	if ( allowed > wanted ) {
+		allowed = wanted;
+	}
+
+	// asymmetric: pull in immediately, push back out over time
+	if ( allowed < cg.camDist ) {
+		cg.camDist = allowed;
+	} else {
+		cg.camDist += ( allowed - cg.camDist )
+			* CG_CameraLagFraction( cg_cam_returnSpeed.value, msec );
+	}
+
+	VectorMA( cg.camAnchor, cg.camDist, boomDir, cg.refdef.vieworg );
 }
 
 
 // this causes a compiler bug on mac MrC compiler
 static void CG_StepOffset( void ) {
-	int		timeDelta;
-	
-	// smooth out stair climbing
-	timeDelta = cg.time - cg.stepTime;
-	if ( timeDelta < STEP_TIME ) {
-		cg.refdef.vieworg[2] -= cg.stepChange 
-			* (STEP_TIME - timeDelta) / STEP_TIME;
-	}
+	cg.refdef.vieworg[2] -= CG_StepOffsetAmount();
 }
 
 /*
@@ -322,8 +434,7 @@ static void CG_OffsetFirstPersonView( void ) {
 	float			speed;
 	float			f;
 	vec3_t			predictedVelocity;
-	int				timeDelta;
-	
+
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		return;
 	}
@@ -395,11 +506,7 @@ static void CG_OffsetFirstPersonView( void ) {
 	origin[2] += cg.predictedPlayerState.viewheight;
 
 	// smooth out duck height changes
-	timeDelta = cg.time - cg.duckTime;
-	if ( timeDelta < DUCK_TIME) {
-		cg.refdef.vieworg[2] -= cg.duckChange 
-			* (DUCK_TIME - timeDelta) / DUCK_TIME;
-	}
+	cg.refdef.vieworg[2] -= CG_DuckOffsetAmount();
 
 	// add bob height
 	bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
@@ -840,7 +947,15 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_PowerupTimerSounds();
 
 	// update audio positions
-	trap_S_Respatialize( cg.snap->ps.clientNum, cg.refdef.vieworg, cg.refdef.viewaxis, inwater );
+	// In third person the camera sits well behind the character, so listening
+	// from it puts every sound at the wrong distance. Listen from the
+	// character but keep the camera's axis, so left/right still matches what
+	// is on screen.
+	if ( cg.renderingThirdPerson && cg_cam_listenerAtPlayer.integer ) {
+		trap_S_Respatialize( cg.snap->ps.clientNum, cg.camAnchor, cg.refdef.viewaxis, inwater );
+	} else {
+		trap_S_Respatialize( cg.snap->ps.clientNum, cg.refdef.vieworg, cg.refdef.viewaxis, inwater );
+	}
 
 	// make sure the lagometerSample and frame timing isn't done twice when in stereo
 	if ( stereoView != STEREO_RIGHT ) {

@@ -142,6 +142,16 @@ vmCvar_t	cg_zoomFov;
 vmCvar_t	cg_thirdPerson;
 vmCvar_t	cg_thirdPersonRange;
 vmCvar_t	cg_thirdPersonAngle;
+vmCvar_t	cg_cam_dist;
+vmCvar_t	cg_cam_minDist;
+vmCvar_t	cg_cam_height;
+vmCvar_t	cg_cam_side;
+vmCvar_t	cg_cam_radius;
+vmCvar_t	cg_cam_followSpeed;
+vmCvar_t	cg_cam_followSpeedZ;
+vmCvar_t	cg_cam_returnSpeed;
+vmCvar_t	cg_cam_clipBodies;
+vmCvar_t	cg_cam_listenerAtPlayer;
 vmCvar_t	cg_lagometer;
 vmCvar_t	cg_drawAttacker;
 vmCvar_t	cg_synchronousClients;
@@ -259,9 +269,21 @@ static cvarTable_t cvarTable[] = {
 	{ &cg_tracerChance, "cg_tracerchance", "0.4", CVAR_CHEAT },
 	{ &cg_tracerWidth, "cg_tracerwidth", "1", CVAR_CHEAT },
 	{ &cg_tracerLength, "cg_tracerlength", "100", CVAR_CHEAT },
-	{ &cg_thirdPersonRange, "cg_thirdPersonRange", "40", CVAR_CHEAT },
-	{ &cg_thirdPersonAngle, "cg_thirdPersonAngle", "0", CVAR_CHEAT },
-	{ &cg_thirdPerson, "cg_thirdPerson", "0", 0 },
+	// legacy third person cvars, superseded by cg_cam_* below. kept so old
+	// configs and the spectator/death cam do not error out.
+	{ &cg_thirdPersonRange, "cg_thirdPersonRange", "40", CVAR_ARCHIVE },
+	{ &cg_thirdPersonAngle, "cg_thirdPersonAngle", "0", CVAR_ARCHIVE },
+	{ &cg_thirdPerson, "cg_thirdPerson", "1", CVAR_ARCHIVE },
+	{ &cg_cam_dist, "cg_cam_dist", "110", CVAR_ARCHIVE },
+	{ &cg_cam_minDist, "cg_cam_minDist", "42", CVAR_ARCHIVE },
+	{ &cg_cam_height, "cg_cam_height", "20", CVAR_ARCHIVE },
+	{ &cg_cam_side, "cg_cam_side", "22", CVAR_ARCHIVE },
+	{ &cg_cam_radius, "cg_cam_radius", "6", CVAR_ARCHIVE },
+	{ &cg_cam_followSpeed, "cg_cam_followSpeed", "18", CVAR_ARCHIVE },
+	{ &cg_cam_followSpeedZ, "cg_cam_followSpeedZ", "30", CVAR_ARCHIVE },
+	{ &cg_cam_returnSpeed, "cg_cam_returnSpeed", "4", CVAR_ARCHIVE },
+	{ &cg_cam_clipBodies, "cg_cam_clipBodies", "0", CVAR_ARCHIVE },
+	{ &cg_cam_listenerAtPlayer, "cg_cam_listenerAtPlayer", "1", CVAR_ARCHIVE },
 	{ &cg_teamChatTime, "cg_teamChatTime", "3000", CVAR_ARCHIVE  },
 	{ &cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  },
 	{ &cg_forceModel, "cg_forceModel", "0", CVAR_ARCHIVE  },

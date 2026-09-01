@@ -487,6 +487,14 @@ typedef struct {
 
 	qboolean	renderingThirdPerson;		// during deaths, chasecams, etc
 
+	// third person spring arm camera. purely client side presentation state:
+	// never feed any of this back into predictedPlayerState or cmd.angles or
+	// prediction will fight it.
+	vec3_t		camAnchor;					// smoothed boom pivot
+	float		camDist;					// smoothed boom length
+	qboolean	camValid;					// false on the first frame / after a teleport
+	vec3_t		camAimPoint;				// world point under the reticle
+
 	// prediction state
 	qboolean	hyperspace;				// true if prediction has hit a trigger_teleport
 	playerState_t	predictedPlayerState;
@@ -1139,6 +1147,16 @@ extern	vmCvar_t		cg_zoomFov;
 extern	vmCvar_t		cg_thirdPersonRange;
 extern	vmCvar_t		cg_thirdPersonAngle;
 extern	vmCvar_t		cg_thirdPerson;
+extern	vmCvar_t		cg_cam_dist;
+extern	vmCvar_t		cg_cam_minDist;
+extern	vmCvar_t		cg_cam_height;
+extern	vmCvar_t		cg_cam_side;
+extern	vmCvar_t		cg_cam_radius;
+extern	vmCvar_t		cg_cam_followSpeed;
+extern	vmCvar_t		cg_cam_followSpeedZ;
+extern	vmCvar_t		cg_cam_returnSpeed;
+extern	vmCvar_t		cg_cam_clipBodies;
+extern	vmCvar_t		cg_cam_listenerAtPlayer;
 extern	vmCvar_t		cg_lagometer;
 extern	vmCvar_t		cg_drawAttacker;
 extern	vmCvar_t		cg_synchronousClients;
