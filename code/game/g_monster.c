@@ -253,6 +253,22 @@ static void G_MonsterSteer( gentity_t *ent, const monsterDef_t *def ) {
 			ai->state = MSTATE_ATTACK;
 			ai->ps.speed = def->walkSpeed;
 		}
+
+		// Keep out of the target's personal space.
+		//
+		// Stopping at the standoff is not enough: a monster coasts past it
+		// under its own momentum, and separation from other monsters can shove
+		// one bodily into the player. Once bodies actually touch, the player is
+		// blocked on that side, and a ring of monsters can pin them in place
+		// with nowhere to go. Backing off keeps a gap they can always move
+		// through.
+		if ( dist > 1 && range < g_monsterPersonalSpace.value ) {
+			float	crowd;
+
+			crowd = ( g_monsterPersonalSpace.value - range )
+				/ g_monsterPersonalSpace.value;
+			VectorMA( desired, -crowd * 2.0f / dist, delta, desired );
+		}
 	}
 
 	G_MonsterSeparation( ent, push );
@@ -347,10 +363,21 @@ void G_RunMonster( gentity_t *ent ) {
 	ent->s.apos.trTime = level.time;
 
 	if ( g_debugMonster.integer && ( level.time % 500 ) < 50 ) {
-		G_Printf( "monster %i state %i enemy %i pos %.0f %.0f %.0f speed %.0f\n",
-			ent->s.number, ai->state, ai->enemyNum,
+		float	enemyRange = -1;
+
+		if ( ai->enemyNum != ENTITYNUM_NONE ) {
+			vec3_t	toEnemy;
+			VectorSubtract( g_entities[ ai->enemyNum ].r.currentOrigin,
+				ai->ps.origin, toEnemy );
+			enemyRange = VectorLength( toEnemy );
+		}
+
+		G_Printf( "monster %i state %i range %.0f pos %.0f %.0f %.0f spd %.0f | player %.0f %.0f %.0f\n",
+			ent->s.number, ai->state, enemyRange,
 			ai->ps.origin[0], ai->ps.origin[1], ai->ps.origin[2],
-			VectorLength( ai->ps.velocity ) );
+			VectorLength( ai->ps.velocity ),
+			g_entities[0].r.currentOrigin[0], g_entities[0].r.currentOrigin[1],
+			g_entities[0].r.currentOrigin[2] );
 	}
 
 	ent->s.legsAnim = ai->ps.legsAnim;

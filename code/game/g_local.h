@@ -761,6 +761,7 @@ extern	vmCvar_t	pm_jumpvel;
 extern	vmCvar_t	g_debugMonster;
 extern	vmCvar_t	g_monsterSightRange;
 extern	vmCvar_t	g_monsterSeparation;
+extern	vmCvar_t	g_monsterPersonalSpace;
 extern	vmCvar_t	g_monsterSeparationWeight;
 extern	vmCvar_t	g_monsterStandoff;
 extern	vmCvar_t	cam_dist;

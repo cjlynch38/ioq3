@@ -61,6 +61,7 @@ vmCvar_t	pm_jumpvel;
 vmCvar_t	g_debugMonster;
 vmCvar_t	g_monsterSightRange;
 vmCvar_t	g_monsterSeparation;
+vmCvar_t	g_monsterPersonalSpace;
 vmCvar_t	g_monsterSeparationWeight;
 vmCvar_t	g_monsterStandoff;
 vmCvar_t	cam_dist;
@@ -169,6 +170,8 @@ static cvarTable_t		gameCvarTable[] = {
 	{ &g_monsterStandoff, "g_monsterStandoff", "56", 0, 0, qfalse },
 	// a little wider than the 30 unit hull, so bodies stop short of overlapping
 	{ &g_monsterSeparation, "g_monsterSeparation", "64", 0, 0, qfalse },
+	// must stay comfortably above the 30 units at which the two hulls touch
+	{ &g_monsterPersonalSpace, "g_monsterPersonalSpace", "52", 0, 0, qfalse },
 	{ &g_monsterSeparationWeight, "g_monsterSeparationWeight", "1.4", 0, 0, qfalse },
 	{ &cam_dist, "cam_dist", "110", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
 	{ &cam_height, "cam_height", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue },
