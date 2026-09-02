@@ -303,6 +303,57 @@ static void G_MonsterSteer( gentity_t *ent, const monsterDef_t *def ) {
 
 /*
 ===============
+G_MonsterAttack
+
+Decides whether to swing, and resolves a swing already in progress.
+
+The swing itself goes through PM_Weapon by pressing the attack button in the
+synthesised usercmd, so a monster's attack animation and timing come from the
+same code as the player's. Only the decision of when to press is AI.
+===============
+*/
+static void G_MonsterAttack( gentity_t *ent, const monsterDef_t *def ) {
+	monsterAI_t			*ai = ent->ai;
+	const meleeAttack_t	*atk;
+	gentity_t			*enemy;
+	vec3_t				delta;
+	float				range;
+
+	atk = BG_MeleeAttackForWeapon( def->weapon );
+	if ( !atk ) {
+		return;
+	}
+
+	// resolve a swing that is already under way, whatever the AI decides next
+	G_MeleeUpdate( ent, &ai->melee, ai->ps.origin, ai->ps.viewangles,
+		ai->ps.viewheight );
+
+	if ( ai->state != MSTATE_ATTACK || ai->enemyNum == ENTITYNUM_NONE ) {
+		return;
+	}
+	if ( level.time < ai->nextAttackTime || ai->ps.weaponTime > 0 ) {
+		return;
+	}
+
+	enemy = &g_entities[ ai->enemyNum ];
+	VectorSubtract( enemy->r.currentOrigin, ai->ps.origin, delta );
+	range = VectorLength( delta );
+
+	// The monster holds station at its personal space, which is further out
+	// than its reach, so it has to lean in to land a blow. Judge against the
+	// attack's own range plus the muzzle offset rather than the standoff.
+	if ( range > atk->range + 24 ) {
+		return;
+	}
+
+	ai->cmd.buttons |= BUTTON_ATTACK;
+	G_MeleeStart( &ai->melee, def->weapon );
+	ai->nextAttackTime = level.time + BG_MeleeSwingTime( atk )
+		+ g_monsterAttackDelay.integer;
+}
+
+/*
+===============
 G_RunMonster
 
 One server frame of a monster: decide, then move with the real player physics.
@@ -325,8 +376,11 @@ void G_RunMonster( gentity_t *ent ) {
 		return;
 	}
 
+	ai->cmd.buttons = 0;
+
 	G_MonsterFindEnemy( ent );
 	G_MonsterSteer( ent, def );
+	G_MonsterAttack( ent, def );
 
 	ai->cmd.serverTime = level.time;
 	ai->ps.gravity = g_gravity.value;
@@ -519,6 +573,13 @@ gentity_t *G_SpawnMonster( const char *name, vec3_t origin, float yaw ) {
 	ent->ai->ps.viewheight = DEFAULT_VIEWHEIGHT;
 	ent->ai->ps.speed = def->runSpeed;
 	ent->ai->ps.gravity = g_gravity.value;
+
+	// Arm it. Giving the monster a real weapon means PM_Weapon runs the same
+	// swing animation and timing the player gets, rather than the AI poking
+	// animation numbers directly and drifting out of step with the player's.
+	ent->ai->ps.weapon = def->weapon;
+	ent->ai->ps.ammo[ def->weapon ] = -1;			// infinite
+	ent->ai->ps.stats[STAT_WEAPONS] = ( 1 << def->weapon );
 	ent->ai->enemyNum = ENTITYNUM_NONE;
 	ent->ai->state = MSTATE_IDLE;
 	VectorCopy( spot, ent->ai->ps.origin );

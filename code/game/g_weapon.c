@@ -60,7 +60,7 @@ GAUNTLET
 void Weapon_Gauntlet( gentity_t *ent ) {
 	// The swing has already started, predicted, inside PM_Weapon. All that
 	// happens here is opening the window during which it can connect.
-	G_MeleeStart( ent );
+	G_MeleeStart( &ent->client->melee, ent->s.weapon );
 }
 
 /*
@@ -86,10 +86,14 @@ G_MeleeStart
 Begin a swing. Called from FireWeapon.
 ===============
 */
-void G_MeleeStart( gentity_t *ent ) {
-	ent->client->meleeStartTime = level.time;
-	ent->client->meleeWeapon = ent->s.weapon;
-	ent->client->meleeHitCount = 0;
+void G_MeleeStart( meleeState_t *ms, int weapon ) {
+	ms->startTime = level.time;
+	ms->weapon = weapon;
+	ms->hitCount = 0;
+
+	if ( g_debugDamage.integer ) {
+		G_Printf( "melee: swing started, weapon %i\n", weapon );
+	}
 }
 
 /*
@@ -100,16 +104,16 @@ One swing may only damage a given target once, however many of its traces
 happen to land on it.
 ===============
 */
-static qboolean G_MeleeAlreadyHit( gclient_t *client, int entityNum ) {
+static qboolean G_MeleeAlreadyHit( meleeState_t *ms, int entityNum ) {
 	int		i;
 
-	for ( i = 0; i < client->meleeHitCount; i++ ) {
-		if ( client->meleeHits[i] == entityNum ) {
+	for ( i = 0; i < ms->hitCount; i++ ) {
+		if ( ms->hits[i] == entityNum ) {
 			return qtrue;
 		}
 	}
-	if ( client->meleeHitCount < ARRAY_LEN( client->meleeHits ) ) {
-		client->meleeHits[ client->meleeHitCount++ ] = entityNum;
+	if ( ms->hitCount < ARRAY_LEN( ms->hits ) ) {
+		ms->hits[ ms->hitCount++ ] = entityNum;
 	}
 	return qfalse;
 }
@@ -121,37 +125,36 @@ G_MeleeUpdate
 Run once per client frame. Does nothing outside the attack's active window.
 ===============
 */
-void G_MeleeUpdate( gentity_t *ent ) {
+void G_MeleeUpdate( gentity_t *ent, meleeState_t *ms, const vec3_t origin,
+					const vec3_t viewangles, float viewheight ) {
 	const meleeAttack_t	*atk;
-	gclient_t	*client;
 	gentity_t	*traceEnt, *tent;
 	trace_t		tr;
-	vec3_t		angles, dir, end, mins, maxs;
+	vec3_t		angles, dir, end, mins, maxs, start;
 	vec3_t		swingForward, swingRight, swingUp;
 	int			elapsed, i, damage;
-	float		yaw;
+	float		yaw, quadFactor;
 
-	client = ent->client;
-	if ( !client || !client->meleeStartTime ) {
+	if ( !ms || !ms->startTime ) {
 		return;
 	}
 
-	atk = BG_MeleeAttackForWeapon( client->meleeWeapon );
+	atk = BG_MeleeAttackForWeapon( ms->weapon );
 	if ( !atk ) {
-		client->meleeStartTime = 0;
+		ms->startTime = 0;
 		return;
 	}
 
-	elapsed = level.time - client->meleeStartTime;
+	elapsed = level.time - ms->startTime;
 
 	if ( elapsed >= atk->windup + atk->active ) {
-		client->meleeStartTime = 0;		// arc has closed
+		ms->startTime = 0;		// arc has closed
 		return;
 	}
 	if ( elapsed < atk->windup ) {
 		return;							// still winding up
 	}
-	if ( client->noclip ) {
+	if ( ent->client && ent->client->noclip ) {
 		return;
 	}
 
@@ -168,18 +171,23 @@ void G_MeleeUpdate( gentity_t *ent ) {
 			yaw = 0;
 		}
 
-		VectorCopy( ent->client->ps.viewangles, angles );
+		VectorCopy( viewangles, angles );
 		angles[YAW] += yaw;
 		AngleVectors( angles, swingForward, swingRight, swingUp );
 
-		CalcMuzzlePoint( ent, swingForward, swingRight, swingUp, muzzle );
-		VectorMA( muzzle, atk->range, swingForward, end );
+		// the muzzle CalcMuzzlePoint would produce, but from explicit inputs so
+		// an attacker with no client slot can swing too
+		VectorCopy( origin, start );
+		start[2] += viewheight;
+		VectorMA( start, 14, swingForward, start );
+		SnapVector( start );
+		VectorMA( start, atk->range, swingForward, end );
 
-		trap_Trace( &tr, muzzle, mins, maxs, end, ent->s.number, MASK_SHOT );
+		trap_Trace( &tr, start, mins, maxs, end, ent->s.number, MASK_SHOT );
 
 		if ( g_debugDamage.integer && tr.entityNum != ENTITYNUM_NONE
 			&& tr.entityNum != ENTITYNUM_WORLD ) {
-			G_Printf( "melee: client %i ray %i at t+%ims connected with entity %i\n",
+			G_Printf( "melee: entity %i ray %i at t+%ims connected with entity %i\n",
 				ent->s.number, i, elapsed, tr.entityNum );
 		}
 
@@ -194,7 +202,11 @@ void G_MeleeUpdate( gentity_t *ent ) {
 		if ( !traceEnt->takedamage ) {
 			continue;
 		}
-		if ( G_MeleeAlreadyHit( client, tr.entityNum ) ) {
+		// monsters do not carve each other up in a scrum
+		if ( ent->s.eType == ET_MONSTER && traceEnt->s.eType == ET_MONSTER ) {
+			continue;
+		}
+		if ( G_MeleeAlreadyHit( ms, tr.entityNum ) ) {
 			continue;
 		}
 
@@ -205,14 +217,13 @@ void G_MeleeUpdate( gentity_t *ent ) {
 			tent->s.weapon = ent->s.weapon;
 		}
 
-		if ( ent->client->ps.powerups[PW_QUAD] ) {
+		quadFactor = 1;
+		if ( ent->client && ent->client->ps.powerups[PW_QUAD] ) {
 			G_AddEvent( ent, EV_POWERUP_QUAD, 0 );
-			s_quadFactor = g_quadfactor.value;
-		} else {
-			s_quadFactor = 1;
+			quadFactor = g_quadfactor.value;
 		}
 
-		damage = atk->damage * s_quadFactor;
+		damage = atk->damage * quadFactor;
 
 		// Push along the swing, not along the surface normal, and with a
 		// knockback figure that is nothing to do with the damage number.

@@ -976,7 +976,8 @@ void ClientThink_real( gentity_t *ent ) {
 	// ClientEvents, so a swing that started this frame gets its windup
 	// respected rather than landing instantly, and after LinkEntity so the
 	// traces run against up to date positions.
-	G_MeleeUpdate( ent );
+	G_MeleeUpdate( ent, &ent->client->melee, ent->client->ps.origin,
+		ent->client->ps.viewangles, ent->client->ps.viewheight );
 	if ( !ent->client->noclip ) {
 		G_TouchTriggers( ent );
 	}

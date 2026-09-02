@@ -67,6 +67,16 @@ typedef enum {
 typedef struct gentity_s gentity_t;
 typedef struct gclient_s gclient_t;
 
+// A swing in progress. Players and monsters both own one, so a single melee
+// implementation serves both rather than the AI growing a parallel copy that
+// drifts out of step with the player's.
+typedef struct {
+	int			startTime;			// level.time the swing began, 0 if idle
+	int			weapon;
+	int			hitCount;
+	int			hits[MAX_CLIENTS];	// dedupe: one swing hits a target once
+} meleeState_t;
+
 #define	MAX_MONSTERS		64
 
 typedef enum {
@@ -85,6 +95,8 @@ typedef struct {
 	int				state;
 	int				enemyNum;
 	int				lastEnemySeen;	// level.time
+	int				nextAttackTime;
+	meleeState_t	melee;
 } monsterAI_t;
 
 struct gentity_s {
@@ -343,10 +355,7 @@ struct gclient_s {
 	// Melee swing in progress. Server side only and never networked: the swing
 	// itself is predicted from bg_pmove.c, but whether it connects is decided
 	// here and sent back as an event.
-	int			meleeStartTime;			// level.time the swing began, 0 if idle
-	int			meleeWeapon;
-	int			meleeHitCount;
-	int			meleeHits[MAX_CLIENTS];	// dedupe, so one swing hits a target once
+	meleeState_t melee;
 
 	char		*areabits;
 };
@@ -532,8 +541,9 @@ void G_MonsterClearAI( void );
 void G_MonsterThink( gentity_t *ent );
 void Svcmd_Monster_f( void );
 
-void G_MeleeStart( gentity_t *ent );
-void G_MeleeUpdate( gentity_t *ent );
+void G_MeleeStart( meleeState_t *ms, int weapon );
+void G_MeleeUpdate( gentity_t *ent, meleeState_t *ms, const vec3_t origin,
+					const vec3_t viewangles, float viewheight );
 qboolean G_RadiusDamage (vec3_t origin, gentity_t *attacker, float damage, float radius, gentity_t *ignore, int mod);
 int G_InvulnerabilityEffect( gentity_t *targ, vec3_t dir, vec3_t point, vec3_t impactpoint, vec3_t bouncedir );
 void body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
@@ -762,6 +772,7 @@ extern	vmCvar_t	g_debugMonster;
 extern	vmCvar_t	g_monsterSightRange;
 extern	vmCvar_t	g_monsterSeparation;
 extern	vmCvar_t	g_monsterPersonalSpace;
+extern	vmCvar_t	g_monsterAttackDelay;
 extern	vmCvar_t	g_monsterSeparationWeight;
 extern	vmCvar_t	g_monsterStandoff;
 extern	vmCvar_t	cam_dist;
